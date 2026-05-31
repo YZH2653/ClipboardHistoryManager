@@ -41,6 +41,9 @@ public:
     // 设置程序根目录
     void SetRootDir (const wstring& rootDir);
 
+    // 设置最大记录数
+    void SetMaxRecords (int maxRecords);
+
     // 处理剪贴板更新
     bool OnClipboardUpdate ();
 
@@ -53,11 +56,14 @@ public:
     // 获取记录数量
     int GetRecordCount () const;
 
-    // 复制内容到剪贴板（内部使用）
+    // 复制内容到剪贴板
     bool CopyToClipboard (const wstring& content);
 
-    // 全局标志：程序内部复制标记
-    static bool s_IsInternalCopy;
+    // 初始化GDI+
+    void InitializeGdiplus ();
+
+    // 清理GDI+
+    void ShutdownGdiplus ();
 
 private:
     // 捕获文字内容
@@ -72,8 +78,16 @@ private:
     // 校验内容合法性
     bool IsValidContent (const wstring& content);
 
+    // 检查是否与最近记录重复
+    bool IsDuplicate (const wstring& content);
+
+    // 清理超出限制的记录
+    void CleanupOldRecords ();
+
     HWND m_hWnd;              // 窗口句柄
     wstring m_rootDir;        // 程序根目录
     vector<ClipRecord> m_records;  // 历史记录
     int m_nextId;             // 下一个ID
+    int m_maxRecords;         // 最大记录数
+    ULONG_PTR m_gdiplusToken; // GDI+令牌
 };

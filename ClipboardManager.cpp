@@ -11,12 +11,9 @@
 #pragma comment(lib, "gdiplus.lib")
 using namespace std;
 
-// 全局标志：程序内部复制标记
-bool ClipboardManager::s_IsInternalCopy = false;
-
 // 构造函数
 ClipboardManager::ClipboardManager ()
-    : m_hWnd (NULL), m_nextId (1)
+    : m_hWnd (NULL), m_nextId (1), m_maxRecords (1000), m_gdiplusToken (0)
 {
 }
 
@@ -47,6 +44,31 @@ void ClipboardManager::SetRootDir (const wstring& rootDir)
     m_rootDir = rootDir;
 }
 
+// 设置最大记录数
+void ClipboardManager::SetMaxRecords (int maxRecords)
+{
+    m_maxRecords = maxRecords;
+}
+
+// 初始化GDI+
+void ClipboardManager::InitializeGdiplus ()
+{
+    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+    Gdiplus::GdiplusStartup (&m_gdiplusToken, &gdiplusStartupInput, NULL);
+    wcout << L"GDI+初始化完成" << endl;
+}
+
+// 清理GDI+
+void ClipboardManager::ShutdownGdiplus ()
+{
+    if (m_gdiplusToken != 0)
+    {
+        Gdiplus::GdiplusShutdown (m_gdiplusToken);
+        m_gdiplusToken = 0;
+        wcout << L"GDI+已清理" << endl;
+    }
+}
+
 // 校验内容合法性
 bool ClipboardManager::IsValidContent (const wstring& content)
 {
@@ -58,27 +80,6 @@ bool ClipboardManager::IsValidContent (const wstring& content)
 
     // 过滤过短内容（少于2个字符）
     if (content.length () < 2)
-    {
-        return false;
-    }
-
-    // 过滤系统命令和错误信息
-    wstring lowerContent = content;
-    transform (lowerContent.begin (), lowerContent.end (), lowerContent.begin (), ::towlower);
-
-    // 过滤PowerShell错误信息
-    if (lowerContent.find (L"out-null") != wstring::npos ||
-        lowerContent.find (L"command") != wstring::npos ||
-        lowerContent.find (L"error") != wstring::npos ||
-        lowerContent.find (L"failed") != wstring::npos)
-    {
-        return false;
-    }
-
-    // 过滤系统路径和命令
-    if (lowerContent.find (L"c:\\windows") != wstring::npos ||
-        lowerContent.find (L"c:/windows") != wstring::npos ||
-        lowerContent.find (L"system32") != wstring::npos)
     {
         return false;
     }
@@ -100,7 +101,56 @@ bool ClipboardManager::IsValidContent (const wstring& content)
     return true;
 }
 
-// 复制内容到剪贴板（内部使用）
+// 检查是否与最近记录重复
+bool ClipboardManager::IsDuplicate (const wstring& content)
+{
+    if (m_records.empty ())
+    {
+        return false;
+    }
+
+    // 检查是否与最近一条记录相同
+    const ClipRecord& last = m_records[0];
+    if (last.type == CLIP_TEXT && last.content == content)
+    {
+        wcout << L"内容与上一条记录重复，跳过捕获" << endl;
+        return true;
+    }
+
+    return false;
+}
+
+// 清理超出限制的记录
+void ClipboardManager::CleanupOldRecords ()
+{
+    if (m_maxRecords <= 0)
+    {
+        return;
+    }
+
+    // 如果超过最大记录数，删除末尾（最旧）的记录
+    while ((int)m_records.size () > m_maxRecords)
+    {
+        // 从末尾开始查找非置顶记录
+        for (auto it = m_records.rbegin (); it != m_records.rend (); ++it)
+        {
+            if (!it->isPinned)
+            {
+                // 删除对应的图片文件
+                if (it->type == CLIP_IMAGE && !it->filePath.empty ())
+                {
+                    DeleteFileW (it->filePath.c_str ());
+                }
+                // 删除记录
+                m_records.erase (--(it.base ()));
+                wcout << L"删除超出限制的记录，当前总数: " << m_records.size () << endl;
+                break;
+            }
+        }
+    }
+}
+
+// 复制内容到剪贴板
 bool ClipboardManager::CopyToClipboard (const wstring& content)
 {
     if (content.empty ())
@@ -108,13 +158,9 @@ bool ClipboardManager::CopyToClipboard (const wstring& content)
         return false;
     }
 
-    // 设置内部复制标记
-    s_IsInternalCopy = true;
-
     // 打开剪贴板
     if (!OpenClipboard (m_hWnd))
     {
-        s_IsInternalCopy = false;
         return false;
     }
 
@@ -126,7 +172,6 @@ bool ClipboardManager::CopyToClipboard (const wstring& content)
     if (hMem == NULL)
     {
         CloseClipboard ();
-        s_IsInternalCopy = false;
         return false;
     }
 
@@ -141,9 +186,6 @@ bool ClipboardManager::CopyToClipboard (const wstring& content)
     // 关闭剪贴板
     CloseClipboard ();
 
-    // 恢复标记
-    s_IsInternalCopy = false;
-
     wcout << L"已复制到剪贴板" << endl;
     return true;
 }
@@ -151,12 +193,6 @@ bool ClipboardManager::CopyToClipboard (const wstring& content)
 // 处理剪贴板更新
 bool ClipboardManager::OnClipboardUpdate ()
 {
-    // 如果是程序内部复制，跳过处理
-    if (s_IsInternalCopy)
-    {
-        return false;
-    }
-
     // 检查是否为文字内容
     if (IsClipboardFormatAvailable (CF_UNICODETEXT))
     {
@@ -222,8 +258,8 @@ bool ClipboardManager::CaptureText ()
         return false;
     }
 
-    // 检查是否与最后一条记录相同（避免重复）
-    if (!m_records.empty () && m_records[0].content == content)
+    // 检查是否与最近记录重复
+    if (IsDuplicate (content))
     {
         return false;
     }
@@ -279,16 +315,8 @@ bool ClipboardManager::CaptureImage ()
     // 获取DIB信息
     BITMAPINFO* pBmi = (BITMAPINFO*)pData;
 
-    // 初始化GDI+
-    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-    ULONG_PTR gdiplusToken;
-    Gdiplus::GdiplusStartup (&gdiplusToken, &gdiplusStartupInput, NULL);
-
-    // 创建GDI+位图
-    Gdiplus::Bitmap* pBitmap = Gdiplus::Bitmap::FromHBITMAP (
-        CreateDIBSection (NULL, pBmi, DIB_RGB_COLORS, NULL, NULL, 0),
-        NULL
-    );
+    // 使用GDI+从DIB数据创建Bitmap
+    Gdiplus::Bitmap* pBitmap = Gdiplus::Bitmap::FromBITMAPINFO (pBmi, pData);
 
     // 生成文件路径（绝对路径）
     int id = GenerateId ();
@@ -302,6 +330,7 @@ bool ClipboardManager::CaptureImage ()
     Gdiplus::GetImageEncodersSize (&num, &size);
     if (size == 0)
     {
+        delete pBitmap;
         GlobalUnlock (hData);
         CloseClipboard ();
         return false;
@@ -335,7 +364,6 @@ bool ClipboardManager::CaptureImage ()
 
     // 清理资源
     delete pBitmap;
-    Gdiplus::GdiplusShutdown (gdiplusToken);
     GlobalUnlock (hData);
     CloseClipboard ();
 
@@ -351,6 +379,9 @@ void ClipboardManager::AddRecord (const ClipRecord& record)
 {
     // 插入到开头（最新的在前面）
     m_records.insert (m_records.begin (), record);
+
+    // 清理超出限制的记录
+    CleanupOldRecords ();
 
     wcout << L"添加记录，当前总数: " << m_records.size () << endl;
 }

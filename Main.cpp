@@ -27,15 +27,10 @@ int G_MaxRecords = 1000;    // 最大记录数
 wstring G_SearchText;       // 搜索文本
 int G_ScrollOffset = 0;     // 滚动偏移量
 int G_HoverIndex = -1;      // 鼠标悬停的卡片索引
-bool G_InternalCopy = false;  // 程序内部复制标记
 
-// 布局常量
-const int SEARCH_BOX_Y = 45;
-const int SEARCH_BOX_HEIGHT = 35;
-const int CARD_START_Y = 90;
-const int CARD_HEIGHT = 80;
-const int CARD_MARGIN = 8;
-const int CARD_PADDING = 15;
+// 窗口尺寸
+int G_WindowWidth = 800;
+int G_WindowHeight = 600;
 
 // 获取exe所在目录
 wstring GetExeDir ()
@@ -89,14 +84,14 @@ void DrawSearchBox (HDC hdc, int x, int y, int width)
 {
     // 绘制背景
     HBRUSH bgBrush = CreateSolidBrush (RGB (245, 245, 245));
-    RECT bgRect = { x, y, x + width, y + SEARCH_BOX_HEIGHT };
+    RECT bgRect = { x, y, x + width, y + 35 };
     FillRect (hdc, &bgRect, bgBrush);
     DeleteObject (bgBrush);
 
     // 绘制边框
     HPEN borderPen = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
     SelectObject (hdc, borderPen);
-    Rectangle (hdc, x, y, x + width, y + SEARCH_BOX_HEIGHT);
+    Rectangle (hdc, x, y, x + width, y + 35);
     DeleteObject (borderPen);
 
     // 绘制搜索图标
@@ -162,7 +157,7 @@ void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool 
     // 绘制卡片背景
     COLORREF bgColor = isHovered ? RGB (245, 248, 255) : RGB (255, 255, 255);
     HBRUSH cardBg = CreateSolidBrush (bgColor);
-    RECT cardRect = { x, y, x + width, y + CARD_HEIGHT };
+    RECT cardRect = { x, y, x + width, y + 80 };
     FillRect (hdc, &cardRect, cardBg);
     DeleteObject (cardBg);
 
@@ -170,18 +165,18 @@ void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool 
     COLORREF borderColor = isHovered ? RGB (100, 149, 237) : RGB (220, 220, 220);
     HPEN borderPen = CreatePen (PS_SOLID, 1, borderColor);
     SelectObject (hdc, borderPen);
-    Rectangle (hdc, x, y, x + width, y + CARD_HEIGHT);
+    Rectangle (hdc, x, y, x + width, y + 80);
     DeleteObject (borderPen);
 
     // 绘制左侧彩色条
     COLORREF accentColor = record.isPinned ? RGB (255, 165, 0) : RGB (100, 149, 237);
     HBRUSH accentBrush = CreateSolidBrush (accentColor);
-    RECT accentRect = { x, y, x + 4, y + CARD_HEIGHT };
+    RECT accentRect = { x, y, x + 4, y + 80 };
     FillRect (hdc, &accentRect, accentBrush);
     DeleteObject (accentBrush);
 
     // 绘制内容预览
-    int contentX = x + CARD_PADDING;
+    int contentX = x + 15;
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
     HFONT contentFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
@@ -208,7 +203,7 @@ void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool 
     DeleteObject (timeFont);
 
     // 绘制操作按钮
-    int buttonY = y + CARD_HEIGHT - 28;
+    int buttonY = y + 80 - 28;
     int buttonX = x + width - 180;
 
     // 复制按钮
@@ -227,9 +222,21 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
+    case WM_SIZE:
+    {
+        // 窗口大小改变时更新尺寸
+        G_WindowWidth = LOWORD (lParam);
+        G_WindowHeight = HIWORD (lParam);
+        InvalidateRect (hWnd, NULL, TRUE);
+        return 0;
+    }
+
     case WM_DESTROY:
         // 移除剪贴板监听
         RemoveClipboardFormatListener (hWnd);
+
+        // 清理GDI+
+        G_ClipManager.ShutdownGdiplus ();
 
         // 保存记录到文件
         G_Storage.SaveRecords (G_ClipManager.GetRecords ());
@@ -262,6 +269,11 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         // 绘制背景
         FillRect (hdc, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW + 1));
 
+        // 计算布局
+        int contentWidth = G_WindowWidth - 40;
+        int searchWidth = contentWidth;
+        int cardWidth = contentWidth;
+
         // 绘制标题
         SetTextColor (hdc, RGB (33, 33, 33));
         SetBkMode (hdc, TRANSPARENT);
@@ -271,39 +283,40 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         DeleteObject (titleFont);
 
         // 绘制搜索框
-        DrawSearchBox (hdc, 20, SEARCH_BOX_Y, 760);
+        DrawSearchBox (hdc, 20, 45, searchWidth);
 
         // 绘制分割线
         HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
         SelectObject (hdc, linePen);
-        MoveToEx (hdc, 20, SEARCH_BOX_Y + SEARCH_BOX_HEIGHT + 10, NULL);
-        LineTo (hdc, 780, SEARCH_BOX_Y + SEARCH_BOX_HEIGHT + 10);
+        MoveToEx (hdc, 20, 90, NULL);
+        LineTo (hdc, 20 + searchWidth, 90);
         DeleteObject (linePen);
 
         // 绘制历史记录列表
         vector<ClipRecord> records = GetFilteredRecords ();
-        int cardY = CARD_START_Y - G_ScrollOffset;
-        int cardWidth = 760;
+        int cardY = 100 - G_ScrollOffset;
+        int cardHeight = 80;
+        int cardMargin = 8;
 
         for (int i = 0; i < (int)records.size (); i++)
         {
             // 检查是否超出可视区域
-            if (cardY + CARD_HEIGHT > 580)
+            if (cardY + cardHeight > G_WindowHeight - 20)
             {
                 break;
             }
 
             // 跳过在可视区域上方的卡片
-            if (cardY + CARD_HEIGHT < 0)
+            if (cardY + cardHeight < 0)
             {
-                cardY += CARD_HEIGHT + CARD_MARGIN;
+                cardY += cardHeight + cardMargin;
                 continue;
             }
 
             // 绘制卡片
             bool isHovered = (i == G_HoverIndex);
             DrawCard (hdc, 20, cardY, cardWidth, records[i], isHovered);
-            cardY += CARD_HEIGHT + CARD_MARGIN;
+            cardY += cardHeight + cardMargin;
         }
 
         // 如果没有记录，显示提示
@@ -313,7 +326,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             SelectObject (hdc, hintFont);
             SetTextColor (hdc, RGB (150, 150, 150));
             wstring hintText = G_SearchText.empty () ? L"暂无历史记录，请复制内容测试" : L"未找到匹配的记录";
-            TextOut (hdc, 300, 250, hintText.c_str (), hintText.length ());
+            TextOut (hdc, G_WindowWidth / 2 - 100, G_WindowHeight / 2, hintText.c_str (), hintText.length ());
             DeleteObject (hintFont);
         }
 
@@ -327,18 +340,20 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         int y = HIWORD (lParam);
 
         // 计算鼠标所在的卡片索引
-        int cardY = CARD_START_Y - G_ScrollOffset;
+        int cardY = 100 - G_ScrollOffset;
+        int cardHeight = 80;
+        int cardMargin = 8;
         vector<ClipRecord> records = GetFilteredRecords ();
         G_HoverIndex = -1;
 
         for (int i = 0; i < (int)records.size (); i++)
         {
-            if (y >= cardY && y < cardY + CARD_HEIGHT && x >= 20 && x <= 780)
+            if (y >= cardY && y < cardY + cardHeight && x >= 20 && x <= G_WindowWidth - 20)
             {
                 G_HoverIndex = i;
                 break;
             }
-            cardY += CARD_HEIGHT + CARD_MARGIN;
+            cardY += cardHeight + cardMargin;
         }
 
         // 刷新窗口
@@ -352,23 +367,25 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         int y = HIWORD (lParam);
 
         // 检查是否点击了搜索框
-        if (y >= SEARCH_BOX_Y && y < SEARCH_BOX_Y + SEARCH_BOX_HEIGHT && x >= 20 && x <= 780)
+        if (y >= 45 && y < 80 && x >= 20 && x <= G_WindowWidth - 20)
         {
             SetFocus (hWnd);
             return 0;
         }
 
         // 检查是否点击了卡片
-        int cardY = CARD_START_Y - G_ScrollOffset;
+        int cardY = 100 - G_ScrollOffset;
+        int cardHeight = 80;
+        int cardMargin = 8;
         vector<ClipRecord> records = GetFilteredRecords ();
 
         for (int i = 0; i < (int)records.size (); i++)
         {
-            if (y >= cardY && y < cardY + CARD_HEIGHT && x >= 20 && x <= 780)
+            if (y >= cardY && y < cardY + cardHeight && x >= 20 && x <= G_WindowWidth - 20)
             {
                 // 检查是否点击了按钮
-                int buttonX = 20 + 760 - 180;
-                int buttonY = cardY + CARD_HEIGHT - 28;
+                int buttonX = 20 + G_WindowWidth - 40 - 180;
+                int buttonY = cardY + cardHeight - 28;
 
                 if (y >= buttonY && y <= buttonY + 22)
                 {
@@ -424,7 +441,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 break;
             }
-            cardY += CARD_HEIGHT + CARD_MARGIN;
+            cardY += cardHeight + cardMargin;
         }
 
         return 0;
@@ -437,7 +454,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         G_ScrollOffset -= delta / 3;
 
         // 限制滚动范围
-        int maxScroll = max (0, (int)GetFilteredRecords ().size () * (CARD_HEIGHT + CARD_MARGIN) - 490);
+        int maxScroll = max (0, (int)GetFilteredRecords ().size () * 88 - (G_WindowHeight - 120));
         G_ScrollOffset = max (0, min (G_ScrollOffset, maxScroll));
 
         InvalidateRect (hWnd, NULL, TRUE);
@@ -483,7 +500,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             // 向下滚动
             G_ScrollOffset += 30;
-            int maxScroll = max (0, (int)GetFilteredRecords ().size () * (CARD_HEIGHT + CARD_MARGIN) - 490);
+            int maxScroll = max (0, (int)GetFilteredRecords ().size () * 88 - (G_WindowHeight - 120));
             G_ScrollOffset = min (G_ScrollOffset, maxScroll);
             InvalidateRect (hWnd, NULL, TRUE);
         }
@@ -529,6 +546,7 @@ int main ()
 
     // 加载设置
     G_Storage.LoadSettings (G_RetentionDays, G_MaxRecords);
+    G_ClipManager.SetMaxRecords (G_MaxRecords);
     wcout << L"保留天数: " << G_RetentionDays << endl;
     wcout << L"最大记录数: " << G_MaxRecords << endl;
 
@@ -572,6 +590,9 @@ int main ()
         wcout << L"剪贴板监听初始化失败" << endl;
         return 0;
     }
+
+    // 初始化GDI+
+    G_ClipManager.InitializeGdiplus ();
 
     // 显示窗口
     ShowWindow (hWnd, SW_SHOW);
