@@ -8,7 +8,6 @@
 #include <sstream>
 #include <algorithm>
 #include <GdiPlus.h>
-#pragma comment(lib, "gdiplus.lib")
 using namespace std;
 
 // 构造函数
