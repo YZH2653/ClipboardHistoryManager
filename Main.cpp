@@ -7,7 +7,7 @@
 #include <fstream>
 #include "ClipboardManager.h"
 #include "Storage.h"
-#include "UIManager.h"
+// #include "UIManager.h"  // 暂时注释UI管理器
 using namespace std;
 
 // 窗口类名
@@ -16,7 +16,7 @@ const wchar_t* CLASS_NAME = L"ClipboardHistoryClass";
 // 全局对象
 ClipboardManager G_ClipManager;
 Storage G_Storage;
-UIManager G_UIManager;
+// UIManager G_UIManager;  // 暂时注释UI管理器
 
 // 设置参数
 int G_RetentionDays = 3;    // 保留天数
@@ -43,13 +43,11 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         G_ClipManager.OnClipboardUpdate ();
 
         // 删除过期记录
-        G_Storage.DeleteExpiredRecords (
-            const_cast<vector<ClipRecord>&> (G_ClipManager.GetRecords ()),
-            G_RetentionDays
-        );
+        vector<ClipRecord>& records = const_cast<vector<ClipRecord>&> (G_ClipManager.GetRecords ());
+        G_Storage.DeleteExpiredRecords (records, G_RetentionDays);
 
         // 保存记录到文件
-        G_Storage.SaveRecords (G_ClipManager.GetRecords ());
+        G_Storage.SaveRecords (records);
 
         // 刷新窗口显示
         InvalidateRect (hWnd, NULL, TRUE);
@@ -61,86 +59,16 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint (hWnd, &ps);
 
-        // 获取客户区
-        RECT clientRect;
-        GetClientRect (hWnd, &clientRect);
+        // 绘制背景
+        FillRect (hdc, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW + 1));
 
-        // 绘制UI
-        G_UIManager.OnPaint (hdc, clientRect);
+        // 显示记录数量
+        SetTextColor (hdc, RGB (0, 0, 0));
+        SetBkMode (hdc, TRANSPARENT);
+        wstring info = L"历史记录数量: " + to_wstring (G_ClipManager.GetRecordCount ());
+        TextOut (hdc, 20, 20, info.c_str (), info.length ());
 
         EndPaint (hWnd, &ps);
-        return 0;
-    }
-
-    case WM_MOUSEMOVE:
-    {
-        int x = LOWORD (lParam);
-        int y = HIWORD (lParam);
-        G_UIManager.OnMouseMove (x, y);
-        return 0;
-    }
-
-    case WM_LBUTTONDOWN:
-    {
-        int x = LOWORD (lParam);
-        int y = HIWORD (lParam);
-        G_UIManager.OnLButtonDown (x, y);
-
-        // 处理置顶操作
-        if (G_UIManager.GetOperationType () == 1)
-        {
-            int recordId = G_UIManager.GetSelectedRecordId ();
-            vector<ClipRecord>& records = const_cast<vector<ClipRecord>&> (G_ClipManager.GetRecords ());
-            for (auto& record : records)
-            {
-                if (record.id == recordId)
-                {
-                    record.isPinned = !record.isPinned;
-                    wcout << L"置顶状态切换: " << record.isPinned << endl;
-                    break;
-                }
-            }
-            G_Storage.SaveRecords (records);
-            G_UIManager.ClearOperation ();
-            InvalidateRect (hWnd, NULL, TRUE);
-        }
-
-        // 处理删除操作
-        if (G_UIManager.GetOperationType () == 2)
-        {
-            int recordId = G_UIManager.GetSelectedRecordId ();
-            vector<ClipRecord>& records = const_cast<vector<ClipRecord>&> (G_ClipManager.GetRecords ());
-            for (auto it = records.begin (); it != records.end (); ++it)
-            {
-                if (it->id == recordId)
-                {
-                    // 删除图片文件
-                    G_Storage.DeleteRecordFile (*it);
-                    // 删除记录
-                    records.erase (it);
-                    wcout << L"删除记录: " << recordId << endl;
-                    break;
-                }
-            }
-            G_Storage.SaveRecords (records);
-            G_UIManager.ClearOperation ();
-            InvalidateRect (hWnd, NULL, TRUE);
-        }
-
-        return 0;
-    }
-
-    case WM_CHAR:
-    {
-        wchar_t ch = (wchar_t)wParam;
-        G_UIManager.OnChar (ch);
-        return 0;
-    }
-
-    case WM_KEYDOWN:
-    {
-        int keyCode = (int)wParam;
-        G_UIManager.OnKeyDown (keyCode);
         return 0;
     }
     }
@@ -212,9 +140,6 @@ int main ()
         wcout << L"剪贴板监听初始化失败" << endl;
         return 0;
     }
-
-    // 初始化UI管理器
-    G_UIManager.Initialize (hWnd, &G_ClipManager);
 
     // 显示窗口
     ShowWindow (hWnd, SW_SHOW);
