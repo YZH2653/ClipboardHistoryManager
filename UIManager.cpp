@@ -30,28 +30,32 @@ bool UIManager::Initialize (HWND hWnd, ClipboardManager* clipManager)
 // 绘制界面
 void UIManager::OnPaint (HDC hdc, RECT clientRect)
 {
-    // 绘制背景
-    HBRUSH bgBrush = CreateSolidBrush (RGB (245, 245, 245));
+    // 绘制白色背景
+    HBRUSH bgBrush = CreateSolidBrush (RGB (255, 255, 255));
     FillRect (hdc, &clientRect, bgBrush);
     DeleteObject (bgBrush);
 
     // 绘制标题
-    SetTextColor (hdc, RGB (51, 51, 51));
+    SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT titleFont = CreateFont (20, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT titleFont = CreateFont (22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, titleFont);
-    TextOut (hdc, CARD_PADDING, 10, L"历史剪贴板管理器", 8);
+    TextOut (hdc, CARD_PADDING, 15, L"历史剪贴板", 5);
     DeleteObject (titleFont);
 
     // 绘制搜索框
-    DrawSearchBox (hdc, CARD_PADDING, 40, clientRect.right - CARD_PADDING * 2);
+    DrawSearchBox (hdc, CARD_PADDING, 55, clientRect.right - CARD_PADDING * 2);
+
+    // 绘制分割线
+    HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
+    SelectObject (hdc, linePen);
+    MoveToEx (hdc, CARD_PADDING, 55 + SEARCH_BOX_HEIGHT + 10, NULL);
+    LineTo (hdc, clientRect.right - CARD_PADDING, 55 + SEARCH_BOX_HEIGHT + 10);
+    DeleteObject (linePen);
 
     // 绘制历史卡片
     vector<ClipRecord> records = GetFilteredRecords ();
-    int cardY = 40 + SEARCH_BOX_HEIGHT + CARD_MARGIN;
-
-    HFONT cardFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
-    HFONT smallFont = CreateFont (12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    int cardY = 55 + SEARCH_BOX_HEIGHT + 20;
 
     for (int i = 0; i < (int)records.size (); i++)
     {
@@ -79,16 +83,14 @@ void UIManager::OnPaint (HDC hdc, RECT clientRect)
         cardY += CARD_HEIGHT + CARD_MARGIN;
     }
 
-    DeleteObject (cardFont);
-    DeleteObject (smallFont);
-
     // 如果没有记录，显示提示
     if (records.empty ())
     {
         HFONT hintFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
         SelectObject (hdc, hintFont);
-        SetTextColor (hdc, RGB (150, 150, 150));
-        TextOut (hdc, clientRect.right / 2 - 80, clientRect.bottom / 2, L"暂无历史记录", 6);
+        SetTextColor (hdc, RGB (180, 180, 180));
+        wstring hintText = m_searchText.empty () ? L"暂无历史记录" : L"未找到匹配的记录";
+        TextOut (hdc, clientRect.right / 2 - 60, clientRect.bottom / 2, hintText.c_str (), hintText.length ());
         DeleteObject (hintFont);
     }
 }
@@ -96,14 +98,14 @@ void UIManager::OnPaint (HDC hdc, RECT clientRect)
 // 绘制搜索框
 void UIManager::DrawSearchBox (HDC hdc, int x, int y, int width)
 {
-    // 绘制搜索框背景
-    HBRUSH searchBg = CreateSolidBrush (RGB (255, 255, 255));
+    // 绘制搜索框背景（浅灰色）
+    HBRUSH searchBg = CreateSolidBrush (RGB (245, 245, 245));
     RECT searchRect = { x, y, x + width, y + SEARCH_BOX_HEIGHT };
     FillRect (hdc, &searchRect, searchBg);
     DeleteObject (searchBg);
 
-    // 绘制边框
-    HPEN borderPen = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
+    // 绘制圆角边框
+    HPEN borderPen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
     SelectObject (hdc, borderPen);
     Rectangle (hdc, x, y, x + width, y + SEARCH_BOX_HEIGHT);
     DeleteObject (borderPen);
@@ -111,72 +113,93 @@ void UIManager::DrawSearchBox (HDC hdc, int x, int y, int width)
     // 绘制搜索图标
     SetTextColor (hdc, RGB (150, 150, 150));
     SetBkMode (hdc, TRANSPARENT);
-    TextOut (hdc, x + 10, y + 10, L"🔍", 1);
+    HFONT iconFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Segoe UI Emoji");
+    SelectObject (hdc, iconFont);
+    TextOut (hdc, x + 12, y + 10, L"🔍", 1);
+    DeleteObject (iconFont);
 
     // 绘制输入文本
-    SetTextColor (hdc, RGB (51, 51, 51));
+    HFONT inputFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, inputFont);
+
     if (m_searchText.empty ())
     {
         SetTextColor (hdc, RGB (180, 180, 180));
-        TextOut (hdc, x + 35, y + 10, L"搜索历史记录...", 7);
+        TextOut (hdc, x + 38, y + 12, L"搜索历史记录...", 7);
     }
     else
     {
-        TextOut (hdc, x + 35, y + 10, m_searchText.c_str (), m_searchText.length ());
+        SetTextColor (hdc, RGB (33, 33, 33));
+        TextOut (hdc, x + 38, y + 12, m_searchText.c_str (), m_searchText.length ());
     }
+
+    DeleteObject (inputFont);
 }
 
 // 绘制历史卡片
 void UIManager::DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool isHovered)
 {
-    // 绘制卡片背景
-    COLORREF bgColor = isHovered ? RGB (240, 248, 255) : RGB (255, 255, 255);
-    HBRUSH cardBg = CreateSolidBrush (bgColor);
+    // 绘制卡片背景（纯白色）
+    HBRUSH cardBg = CreateSolidBrush (RGB (255, 255, 255));
     RECT cardRect = { x, y, x + width, y + CARD_HEIGHT };
     FillRect (hdc, &cardRect, cardBg);
     DeleteObject (cardBg);
 
-    // 绘制边框
-    COLORREF borderColor = isHovered ? RGB (100, 149, 237) : RGB (220, 220, 220);
-    HPEN borderPen = CreatePen (PS_SOLID, 1, borderColor);
-    SelectObject (hdc, borderPen);
-    Rectangle (hdc, x, y, x + width, y + CARD_HEIGHT);
-    DeleteObject (borderPen);
+    // 绘制底部边框（浅灰色）
+    HPEN linePen = CreatePen (PS_SOLID, 1, RGB (240, 240, 240));
+    SelectObject (hdc, linePen);
+    MoveToEx (hdc, x, y + CARD_HEIGHT, NULL);
+    LineTo (hdc, x + width, y + CARD_HEIGHT);
+    DeleteObject (linePen);
+
+    // 绘制左侧彩色条（根据类型）
+    COLORREF accentColor = (record.type == CLIP_TEXT) ? RGB (100, 149, 237) : RGB (255, 140, 0);
+    HBRUSH accentBrush = CreateSolidBrush (accentColor);
+    RECT accentRect = { x, y, x + 4, y + CARD_HEIGHT };
+    FillRect (hdc, &accentRect, accentBrush);
+    DeleteObject (accentBrush);
 
     // 绘制置顶标记
+    int contentX = x + 15;
     if (record.isPinned)
     {
         SetTextColor (hdc, RGB (255, 165, 0));
         SetBkMode (hdc, TRANSPARENT);
-        TextOut (hdc, x + CARD_PADDING, y + 5, L"📌", 1);
+        HFONT pinFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Segoe UI Emoji");
+        SelectObject (hdc, pinFont);
+        TextOut (hdc, contentX, y + 10, L"📌", 1);
+        DeleteObject (pinFont);
+        contentX += 20;
     }
 
-    // 绘制类型图标
-    wstring typeIcon = (record.type == CLIP_TEXT) ? L"📝" : L"🖼️";
-    SetTextColor (hdc, RGB (100, 100, 100));
-    SetBkMode (hdc, TRANSPARENT);
-    TextOut (hdc, x + CARD_PADDING + (record.isPinned ? 20 : 0), y + 5, typeIcon.c_str (), typeIcon.length ());
-
-    // 绘制时间
+    // 绘制时间（右上角）
     time_t timestamp = record.timestamp;
     struct tm timeInfo;
     localtime_s (&timeInfo, &timestamp);
     wchar_t timeStr[32];
-    wcsftime (timeStr, 32, L"%Y-%m-%d %H:%M", &timeInfo);
-    SetTextColor (hdc, RGB (150, 150, 150));
-    TextOut (hdc, x + width - 120, y + 5, timeStr, wcslen (timeStr));
+    wcsftime (timeStr, 32, L"%m-%d %H:%M", &timeInfo);
+    SetTextColor (hdc, RGB (180, 180, 180));
+    SetBkMode (hdc, TRANSPARENT);
+    HFONT timeFont = CreateFont (12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, timeFont);
+    TextOut (hdc, x + width - 80, y + 10, timeStr, wcslen (timeStr));
+    DeleteObject (timeFont);
 
     // 绘制内容预览
-    SetTextColor (hdc, RGB (51, 51, 51));
-    wstring preview = record.preview;
-    if (preview.length () > 80)
-    {
-        preview = preview.substr (0, 80) + L"...";
-    }
-    TextOut (hdc, x + CARD_PADDING, y + 30, preview.c_str (), preview.length ());
+    SetTextColor (hdc, RGB (33, 33, 33));
+    HFONT contentFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, contentFont);
 
-    // 绘制操作按钮
-    int buttonY = y + CARD_HEIGHT - BUTTON_HEIGHT - 10;
+    wstring preview = record.preview;
+    if (preview.length () > 60)
+    {
+        preview = preview.substr (0, 60) + L"...";
+    }
+    TextOut (hdc, contentX, y + 35, preview.c_str (), preview.length ());
+    DeleteObject (contentFont);
+
+    // 绘制操作按钮（扁平化设计）
+    int buttonY = y + CARD_HEIGHT - BUTTON_HEIGHT - 12;
     int buttonX = x + width - BUTTON_WIDTH * 3 - BUTTON_MARGIN * 2;
 
     // 复制按钮
@@ -190,28 +213,36 @@ void UIManager::DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& re
     DrawButton (hdc, buttonX + (BUTTON_WIDTH + BUTTON_MARGIN) * 2, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT, L"删除", false);
 }
 
-// 绘制按钮
+// 绘制按钮（扁平化设计）
 void UIManager::DrawButton (HDC hdc, int x, int y, int width, int height, const wstring& text, bool isHovered)
 {
-    // 绘制按钮背景
-    COLORREF btnColor = isHovered ? RGB (70, 130, 180) : RGB (100, 149, 237);
-    HBRUSH btnBg = CreateSolidBrush (btnColor);
+    // 绘制按钮背景（浅灰色）
+    COLORREF bgColor = isHovered ? RGB (230, 230, 230) : RGB (245, 245, 245);
+    HBRUSH btnBg = CreateSolidBrush (bgColor);
     RECT btnRect = { x, y, x + width, y + height };
     FillRect (hdc, &btnRect, btnBg);
     DeleteObject (btnBg);
 
     // 绘制边框
-    HPEN borderPen = CreatePen (PS_SOLID, 1, RGB (70, 130, 180));
+    HPEN borderPen = CreatePen (PS_SOLID, 1, RGB (220, 220, 220));
     SelectObject (hdc, borderPen);
     Rectangle (hdc, x, y, x + width, y + height);
     DeleteObject (borderPen);
 
     // 绘制文字
-    SetTextColor (hdc, RGB (255, 255, 255));
+    SetTextColor (hdc, RGB (80, 80, 80));
     SetBkMode (hdc, TRANSPARENT);
-    int textX = x + (width - text.length () * 7) / 2;
-    int textY = y + (height - 14) / 2;
+    HFONT btnFont = CreateFont (12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, btnFont);
+
+    // 计算文字居中位置
+    SIZE textSize;
+    GetTextExtentPoint32 (hdc, text.c_str (), text.length (), &textSize);
+    int textX = x + (width - textSize.cx) / 2;
+    int textY = y + (height - textSize.cy) / 2;
     TextOut (hdc, textX, textY, text.c_str (), text.length ());
+
+    DeleteObject (btnFont);
 }
 
 // 绘制文字（自动换行）
@@ -269,7 +300,7 @@ void UIManager::OnMouseMove (int x, int y)
     m_hoverButtonIndex = -1;
 
     // 计算鼠标所在的卡片
-    int cardY = 40 + SEARCH_BOX_HEIGHT + CARD_MARGIN - m_scrollOffset;
+    int cardY = 55 + SEARCH_BOX_HEIGHT + 20 - m_scrollOffset;
     vector<ClipRecord> records = GetFilteredRecords ();
 
     for (int i = 0; i < (int)records.size (); i++)
@@ -292,7 +323,7 @@ void UIManager::OnLButtonDown (int x, int y)
     // 检查是否点击了搜索框
     RECT clientRect;
     GetClientRect (m_hWnd, &clientRect);
-    if (y >= 40 && y < 40 + SEARCH_BOX_HEIGHT)
+    if (y >= 55 && y < 55 + SEARCH_BOX_HEIGHT)
     {
         // 激活搜索框
         SetFocus (m_hWnd);
@@ -301,7 +332,7 @@ void UIManager::OnLButtonDown (int x, int y)
 
     // 检查是否点击了卡片
     vector<ClipRecord> records = GetFilteredRecords ();
-    int cardY = 40 + SEARCH_BOX_HEIGHT + CARD_MARGIN - m_scrollOffset;
+    int cardY = 55 + SEARCH_BOX_HEIGHT + 20 - m_scrollOffset;
 
     for (int i = 0; i < (int)records.size (); i++)
     {
@@ -311,7 +342,7 @@ void UIManager::OnLButtonDown (int x, int y)
             int cardX = CARD_PADDING;
             int cardWidth = clientRect.right - CARD_PADDING * 2;
             int buttonX = cardX + cardWidth - BUTTON_WIDTH * 3 - BUTTON_MARGIN * 2;
-            int buttonY = cardY + CARD_HEIGHT - BUTTON_HEIGHT - 10;
+            int buttonY = cardY + CARD_HEIGHT - BUTTON_HEIGHT - 12;
 
             if (x >= buttonX && x < buttonX + BUTTON_WIDTH)
             {
