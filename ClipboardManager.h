@@ -53,11 +53,11 @@ public:
     // 获取记录数量
     int GetRecordCount () const;
 
-    // 暂停/恢复监听
-    void SetListening (bool listening);
-
-    // 复制内容到剪贴板
+    // 复制内容到剪贴板（内部使用）
     bool CopyToClipboard (const wstring& content);
+
+    // 全局标志：程序内部复制标记
+    static bool s_IsInternalCopy;
 
 private:
     // 捕获文字内容
@@ -76,5 +76,4 @@ private:
     wstring m_rootDir;        // 程序根目录
     vector<ClipRecord> m_records;  // 历史记录
     int m_nextId;             // 下一个ID
-    bool m_isListening;       // 是否正在监听
 };

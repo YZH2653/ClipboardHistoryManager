@@ -27,6 +27,7 @@ int G_MaxRecords = 1000;    // 最大记录数
 wstring G_SearchText;       // 搜索文本
 int G_ScrollOffset = 0;     // 滚动偏移量
 int G_HoverIndex = -1;      // 鼠标悬停的卡片索引
+bool G_InternalCopy = false;  // 程序内部复制标记
 
 // 布局常量
 const int SEARCH_BOX_Y = 45;

@@ -11,9 +11,12 @@
 #pragma comment(lib, "gdiplus.lib")
 using namespace std;
 
+// 全局标志：程序内部复制标记
+bool ClipboardManager::s_IsInternalCopy = false;
+
 // 构造函数
 ClipboardManager::ClipboardManager ()
-    : m_hWnd (NULL), m_nextId (1), m_isListening (true)
+    : m_hWnd (NULL), m_nextId (1)
 {
 }
 
@@ -42,12 +45,6 @@ bool ClipboardManager::Initialize (HWND hWnd)
 void ClipboardManager::SetRootDir (const wstring& rootDir)
 {
     m_rootDir = rootDir;
-}
-
-// 暂停/恢复监听
-void ClipboardManager::SetListening (bool listening)
-{
-    m_isListening = listening;
 }
 
 // 校验内容合法性
@@ -95,7 +92,7 @@ bool ClipboardManager::IsValidContent (const wstring& content)
             nonPrintableCount++;
         }
     }
-    if (nonPrintableCount > content.length () / 10)
+    if (nonPrintableCount > (int)content.length () / 10)
     {
         return false;
     }
@@ -103,7 +100,7 @@ bool ClipboardManager::IsValidContent (const wstring& content)
     return true;
 }
 
-// 复制内容到剪贴板
+// 复制内容到剪贴板（内部使用）
 bool ClipboardManager::CopyToClipboard (const wstring& content)
 {
     if (content.empty ())
@@ -111,13 +108,13 @@ bool ClipboardManager::CopyToClipboard (const wstring& content)
         return false;
     }
 
-    // 暂停监听，防止重复记录
-    SetListening (false);
+    // 设置内部复制标记
+    s_IsInternalCopy = true;
 
     // 打开剪贴板
     if (!OpenClipboard (m_hWnd))
     {
-        SetListening (true);
+        s_IsInternalCopy = false;
         return false;
     }
 
@@ -129,7 +126,7 @@ bool ClipboardManager::CopyToClipboard (const wstring& content)
     if (hMem == NULL)
     {
         CloseClipboard ();
-        SetListening (true);
+        s_IsInternalCopy = false;
         return false;
     }
 
@@ -144,8 +141,8 @@ bool ClipboardManager::CopyToClipboard (const wstring& content)
     // 关闭剪贴板
     CloseClipboard ();
 
-    // 恢复监听
-    SetListening (true);
+    // 恢复标记
+    s_IsInternalCopy = false;
 
     wcout << L"已复制到剪贴板" << endl;
     return true;
@@ -154,8 +151,8 @@ bool ClipboardManager::CopyToClipboard (const wstring& content)
 // 处理剪贴板更新
 bool ClipboardManager::OnClipboardUpdate ()
 {
-    // 如果暂停监听，跳过处理
-    if (!m_isListening)
+    // 如果是程序内部复制，跳过处理
+    if (s_IsInternalCopy)
     {
         return false;
     }
