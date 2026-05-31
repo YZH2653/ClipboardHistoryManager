@@ -20,6 +20,12 @@ Storage::~Storage ()
 {
 }
 
+// 设置程序根目录
+void Storage::SetRootDir (const wstring& rootDir)
+{
+    m_rootDir = rootDir;
+}
+
 // 初始化存储系统
 bool Storage::Initialize ()
 {
@@ -32,20 +38,27 @@ bool Storage::Initialize ()
 // 确保存储目录存在
 void Storage::EnsureDirectories ()
 {
-    CreateDirectory (L"clips", NULL);
-    CreateDirectory (L"clips/images", NULL);
+    // 创建clips目录
+    wstring clipsDir = m_rootDir + L"\\clips";
+    CreateDirectoryW (clipsDir.c_str (), NULL);
+
+    // 创建images目录
+    wstring imagesDir = m_rootDir + L"\\clips\\images";
+    CreateDirectoryW (imagesDir.c_str (), NULL);
 }
 
-// 获取索引文件路径
+// 获取索引文件路径（绝对路径）
 string Storage::GetIndexPath ()
 {
-    return "clips/history.json";
+    wstring fullPath = m_rootDir + L"\\clips\\history.json";
+    return wstring_to_string (fullPath);
 }
 
-// 获取设置文件路径
+// 获取设置文件路径（绝对路径）
 string Storage::GetSettingsPath ()
 {
-    return "clips/settings.json";
+    wstring fullPath = m_rootDir + L"\\clips\\settings.json";
+    return wstring_to_string (fullPath);
 }
 
 // 保存记录到文件

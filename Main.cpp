@@ -22,6 +22,20 @@ Storage G_Storage;
 int G_RetentionDays = 3;    // 保留天数
 int G_MaxRecords = 1000;    // 最大记录数
 
+// 获取exe所在目录
+wstring GetExeDir ()
+{
+    wchar_t path[MAX_PATH];
+    GetModuleFileNameW (NULL, path, MAX_PATH);
+    wstring fullPath (path);
+    size_t pos = fullPath.find_last_of (L"\\");
+    if (pos != wstring::npos)
+    {
+        return fullPath.substr (0, pos);
+    }
+    return fullPath;
+}
+
 // 窗口过程函数
 LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -78,11 +92,16 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 // 主函数
 int main ()
 {
+    // 获取exe所在目录并切换到该目录
+    wstring exeDir = GetExeDir ();
+    SetCurrentDirectoryW (exeDir.c_str ());
+
     // 重定向控制台输出（调试用）
     AllocConsole ();
     freopen ("CONOUT$", "w", stdout);
 
     wcout << L"历史剪贴板管理器启动中..." << endl;
+    wcout << L"程序目录: " << exeDir << endl;
 
     // 初始化存储系统
     G_Storage.Initialize ();
