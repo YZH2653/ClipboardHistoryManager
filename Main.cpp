@@ -469,20 +469,24 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         int cardHeight = 100;
         int cardMargin = 10;
         vector<ClipRecord> records = GetFilteredRecords ();
-        G_HoverIndex = -1;
+        int newHoverIndex = -1;
 
         for (int i = 0; i < (int)records.size (); i++)
         {
             if (y >= cardY && y < cardY + cardHeight && x >= 20 && x <= G_WindowWidth - 20)
             {
-                G_HoverIndex = i;
+                newHoverIndex = i;
                 break;
             }
             cardY += cardHeight + cardMargin;
         }
 
-        // 刷新窗口
-        InvalidateRect (hWnd, NULL, TRUE);
+        // 只有当悬停索引改变时才刷新窗口
+        if (newHoverIndex != G_HoverIndex)
+        {
+            G_HoverIndex = newHoverIndex;
+            InvalidateRect (hWnd, NULL, TRUE);
+        }
         return 0;
     }
 
