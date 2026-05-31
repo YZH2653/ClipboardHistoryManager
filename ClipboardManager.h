@@ -38,6 +38,9 @@ public:
     // 初始化剪贴板监听
     bool Initialize (HWND hWnd);
 
+    // 设置程序根目录
+    void SetRootDir (const wstring& rootDir);
+
     // 处理剪贴板更新
     bool OnClipboardUpdate ();
 
@@ -61,6 +64,7 @@ private:
     int GenerateId ();
 
     HWND m_hWnd;              // 窗口句柄
+    wstring m_rootDir;        // 程序根目录
     vector<ClipRecord> m_records;  // 历史记录
     int m_nextId;             // 下一个ID
 };

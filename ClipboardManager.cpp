@@ -1,5 +1,7 @@
 #define UNICODE
 #define _UNICODE
+#define WINVER 0x0601
+#define _WIN32_WINNT 0x0601
 #include "ClipboardManager.h"
 #include <iostream>
 #include <fstream>
@@ -34,6 +36,12 @@ bool ClipboardManager::Initialize (HWND hWnd)
 
     wcout << L"剪贴板监听初始化成功" << endl;
     return true;
+}
+
+// 设置程序根目录
+void ClipboardManager::SetRootDir (const wstring& rootDir)
+{
+    m_rootDir = rootDir;
 }
 
 // 处理剪贴板更新
@@ -156,9 +164,9 @@ bool ClipboardManager::CaptureImage ()
         NULL
     );
 
-    // 生成文件路径
+    // 生成文件路径（绝对路径）
     int id = GenerateId ();
-    wstring filePath = L"clips/images/" + to_wstring (id) + L".png";
+    wstring filePath = m_rootDir + L"\\clips\\images\\" + to_wstring (id) + L".png";
 
     // 保存为PNG
     CLSID pngClsid;
