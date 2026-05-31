@@ -6,20 +6,19 @@
 #include <iostream>
 #include <fstream>
 #include "ClipboardManager.h"
+#include "Storage.h"
 using namespace std;
 
 // 窗口类名
 const wchar_t* CLASS_NAME = L"ClipboardHistoryClass";
 
-// 全局剪贴板管理器
+// 全局对象
 ClipboardManager G_ClipManager;
+Storage G_Storage;
 
-// 创建存储目录
-void CreateStorageDirs ()
-{
-    CreateDirectory (L"clips", NULL);
-    CreateDirectory (L"clips/images", NULL);
-}
+// 设置参数
+int G_RetentionDays = 3;    // 保留天数
+int G_MaxRecords = 1000;    // 最大记录数
 
 // 窗口过程函数
 LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -29,13 +28,31 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_DESTROY:
         // 移除剪贴板监听
         RemoveClipboardFormatListener (hWnd);
+
+        // 保存记录到文件
+        G_Storage.SaveRecords (G_ClipManager.GetRecords ());
+
         PostQuitMessage (0);
         return 0;
 
     case WM_CLIPBOARDUPDATE:
+    {
         // 处理剪贴板更新
         G_ClipManager.OnClipboardUpdate ();
+
+        // 删除过期记录
+        G_Storage.DeleteExpiredRecords (
+            const_cast<vector<ClipRecord>&> (G_ClipManager.GetRecords ()),
+            G_RetentionDays
+        );
+
+        // 保存记录到文件
+        G_Storage.SaveRecords (G_ClipManager.GetRecords ());
+
+        // 刷新窗口显示
+        InvalidateRect (hWnd, NULL, TRUE);
         return 0;
+    }
 
     case WM_PAINT:
     {
@@ -66,9 +83,28 @@ int main ()
 
     wcout << L"历史剪贴板管理器启动中..." << endl;
 
-    // 创建存储目录
-    CreateStorageDirs ();
-    wcout << L"存储目录创建完成" << endl;
+    // 初始化存储系统
+    G_Storage.Initialize ();
+
+    // 加载历史记录
+    vector<ClipRecord> records;
+    G_Storage.LoadRecords (records);
+    for (const auto& record : records)
+    {
+        G_ClipManager.AddRecord (record);
+    }
+
+    // 加载设置
+    G_Storage.LoadSettings (G_RetentionDays, G_MaxRecords);
+    wcout << L"保留天数: " << G_RetentionDays << endl;
+    wcout << L"最大记录数: " << G_MaxRecords << endl;
+
+    // 删除过期记录
+    int deletedCount = G_Storage.DeleteExpiredRecords (records, G_RetentionDays);
+    if (deletedCount > 0)
+    {
+        G_Storage.SaveRecords (records);
+    }
 
     // 获取模块句柄
     HINSTANCE hInstance = GetModuleHandle (NULL);

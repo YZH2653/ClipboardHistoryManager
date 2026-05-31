@@ -75,6 +75,12 @@ keywords:
 - 复杂逻辑只在关键位置加简短注释
 - 禁止使用多行注释 `/* */`，全部使用单行注释 `//`
 
+### 文档与日期规范
+- 所有文档和开发日志中的日期必须使用**当前真实日期**，格式为：YYYY-MM-DD
+- 开发日志文件名使用ISO日期格式：YYYY-MM-DD.md
+- 每次开发完成后自动更新对应日期的开发日志
+- 日志内容包括：今日完成功能、遇到的问题、明日计划、进度统计
+
 ### 正确排版示范
 ```cpp
 // 显示主菜单
@@ -96,9 +102,9 @@ void AddStudent ()
 double CalculateAverage ()
 {
     int Sum = 0;
-    for ( int i = 0; i < g_StudentNum; i++ )
+    for ( int i = 0; i < G_StudentNum; i++ )
     {
         Sum += Score[i];
     }
-    return (double)Sum / g_StudentNum;
+    return (double)Sum / G_StudentNum;
 }

@@ -213,7 +213,7 @@ bool ClipboardManager::CaptureImage ()
 }
 
 // 添加记录
-void ClipboardManager::AddRecord (ClipRecord& record)
+void ClipboardManager::AddRecord (const ClipRecord& record)
 {
     // 插入到开头（最新的在前面）
     m_records.insert (m_records.begin (), record);

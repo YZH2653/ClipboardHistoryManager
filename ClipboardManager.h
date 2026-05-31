@@ -41,6 +41,9 @@ public:
     // 处理剪贴板更新
     bool OnClipboardUpdate ();
 
+    // 添加记录（从外部加载）
+    void AddRecord (const ClipRecord& record);
+
     // 获取所有历史记录
     const vector<ClipRecord>& GetRecords () const;
 
@@ -53,9 +56,6 @@ private:
 
     // 捕获图片内容
     bool CaptureImage ();
-
-    // 添加记录
-    void AddRecord (ClipRecord& record);
 
     // 生成唯一ID
     int GenerateId ();
