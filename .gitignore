@@ -1,0 +1,19 @@
+# C++编译产物
+*.exe
+*.obj
+*.pdb
+*.ilk
+*.out
+
+# 输出文件夹
+output/
+bin/
+build/
+
+# VS Code工作区文件
+.vscode/
+*.code-workspace
+
+# 临时文件
+*.tmp
+*.log
