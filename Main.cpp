@@ -7,6 +7,7 @@
 #include <fstream>
 #include "ClipboardManager.h"
 #include "Storage.h"
+#include "UIManager.h"
 using namespace std;
 
 // 窗口类名
@@ -15,6 +16,7 @@ const wchar_t* CLASS_NAME = L"ClipboardHistoryClass";
 // 全局对象
 ClipboardManager G_ClipManager;
 Storage G_Storage;
+UIManager G_UIManager;
 
 // 设置参数
 int G_RetentionDays = 3;    // 保留天数
@@ -58,16 +60,45 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint (hWnd, &ps);
-        // 绘制背景
-        FillRect (hdc, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW + 1));
 
-        // 显示记录数量
-        SetTextColor (hdc, RGB (0, 0, 0));
-        SetBkMode (hdc, TRANSPARENT);
-        wstring info = L"历史记录数量: " + to_wstring (G_ClipManager.GetRecordCount ());
-        TextOut (hdc, 20, 20, info.c_str (), info.length ());
+        // 获取客户区
+        RECT clientRect;
+        GetClientRect (hWnd, &clientRect);
+
+        // 绘制UI
+        G_UIManager.OnPaint (hdc, clientRect);
 
         EndPaint (hWnd, &ps);
+        return 0;
+    }
+
+    case WM_MOUSEMOVE:
+    {
+        int x = LOWORD (lParam);
+        int y = HIWORD (lParam);
+        G_UIManager.OnMouseMove (x, y);
+        return 0;
+    }
+
+    case WM_LBUTTONDOWN:
+    {
+        int x = LOWORD (lParam);
+        int y = HIWORD (lParam);
+        G_UIManager.OnLButtonDown (x, y);
+        return 0;
+    }
+
+    case WM_CHAR:
+    {
+        wchar_t ch = (wchar_t)wParam;
+        G_UIManager.OnChar (ch);
+        return 0;
+    }
+
+    case WM_KEYDOWN:
+    {
+        int keyCode = (int)wParam;
+        G_UIManager.OnKeyDown (keyCode);
         return 0;
     }
     }
@@ -139,6 +170,9 @@ int main ()
         wcout << L"剪贴板监听初始化失败" << endl;
         return 0;
     }
+
+    // 初始化UI管理器
+    G_UIManager.Initialize (hWnd, &G_ClipManager);
 
     // 显示窗口
     ShowWindow (hWnd, SW_SHOW);
