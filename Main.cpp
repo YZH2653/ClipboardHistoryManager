@@ -36,6 +36,48 @@ wstring GetExeDir ()
     return fullPath;
 }
 
+// 绘制卡片
+void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record)
+{
+    // 绘制卡片背景
+    HBRUSH cardBg = CreateSolidBrush (RGB (255, 255, 255));
+    RECT cardRect = { x, y, x + width, y + 80 };
+    FillRect (hdc, &cardRect, cardBg);
+    DeleteObject (cardBg);
+
+    // 绘制边框
+    HPEN borderPen = CreatePen (PS_SOLID, 1, RGB (220, 220, 220));
+    SelectObject (hdc, borderPen);
+    Rectangle (hdc, x, y, x + width, y + 80);
+    DeleteObject (borderPen);
+
+    // 绘制内容预览
+    SetTextColor (hdc, RGB (33, 33, 33));
+    SetBkMode (hdc, TRANSPARENT);
+    HFONT contentFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, contentFont);
+
+    wstring preview = record.preview;
+    if (preview.length () > 50)
+    {
+        preview = preview.substr (0, 50) + L"...";
+    }
+    TextOut (hdc, x + 10, y + 10, preview.c_str (), preview.length ());
+    DeleteObject (contentFont);
+
+    // 绘制时间
+    time_t timestamp = record.timestamp;
+    struct tm timeInfo;
+    localtime_s (&timeInfo, &timestamp);
+    wchar_t timeStr[32];
+    wcsftime (timeStr, 32, L"%Y-%m-%d %H:%M", &timeInfo);
+    SetTextColor (hdc, RGB (150, 150, 150));
+    HFONT timeFont = CreateFont (12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, timeFont);
+    TextOut (hdc, x + 10, y + 55, timeStr, wcslen (timeStr));
+    DeleteObject (timeFont);
+}
+
 // 窗口过程函数
 LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -76,11 +118,55 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         // 绘制背景
         FillRect (hdc, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW + 1));
 
-        // 显示记录数量
-        SetTextColor (hdc, RGB (0, 0, 0));
+        // 绘制标题
+        SetTextColor (hdc, RGB (33, 33, 33));
         SetBkMode (hdc, TRANSPARENT);
-        wstring info = L"历史记录数量: " + to_wstring (G_ClipManager.GetRecordCount ());
-        TextOut (hdc, 20, 20, info.c_str (), info.length ());
+        HFONT titleFont = CreateFont (18, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+        SelectObject (hdc, titleFont);
+        TextOut (hdc, 20, 15, L"历史剪贴板管理器", 8);
+        DeleteObject (titleFont);
+
+        // 绘制记录数量
+        HFONT countFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+        SelectObject (hdc, countFont);
+        wstring info = L"共 " + to_wstring (G_ClipManager.GetRecordCount ()) + L" 条记录";
+        TextOut (hdc, 20, 50, info.c_str (), info.length ());
+        DeleteObject (countFont);
+
+        // 绘制分割线
+        HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
+        SelectObject (hdc, linePen);
+        MoveToEx (hdc, 20, 75, NULL);
+        LineTo (hdc, 780, 75);
+        DeleteObject (linePen);
+
+        // 绘制历史记录列表
+        const vector<ClipRecord>& records = G_ClipManager.GetRecords ();
+        int cardY = 85;
+        int cardWidth = 760;
+
+        for (int i = 0; i < (int)records.size () && i < 6; i++)
+        {
+            // 检查是否超出可视区域
+            if (cardY + 90 > 580)
+            {
+                break;
+            }
+
+            // 绘制卡片
+            DrawCard (hdc, 20, cardY, cardWidth, records[i]);
+            cardY += 90;
+        }
+
+        // 如果没有记录，显示提示
+        if (records.empty ())
+        {
+            HFONT hintFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+            SelectObject (hdc, hintFont);
+            SetTextColor (hdc, RGB (150, 150, 150));
+            TextOut (hdc, 300, 250, L"暂无历史记录，请复制内容测试", 14);
+            DeleteObject (hintFont);
+        }
 
         EndPaint (hWnd, &ps);
         return 0;
@@ -104,6 +190,7 @@ int main ()
     wcout << L"程序目录: " << exeDir << endl;
 
     // 初始化存储系统
+    G_Storage.SetRootDir (exeDir);
     G_Storage.Initialize ();
 
     // 加载历史记录
@@ -162,6 +249,7 @@ int main ()
 
     // 显示窗口
     ShowWindow (hWnd, SW_SHOW);
+    UpdateWindow (hWnd);
     wcout << L"窗口显示成功" << endl;
     wcout << L"请尝试复制文字或图片进行测试..." << endl;
 
