@@ -17,3 +17,16 @@ build/
 # 临时文件
 *.tmp
 *.log
+
+# 本地配置
+.claude/
+
+# 存储数据（本地使用）
+clips/
+
+# 便携版（单独管理）
+portable/
+
+# 程序运行时生成的文件
+*.json
+!docs/*.json
