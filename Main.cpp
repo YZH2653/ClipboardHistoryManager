@@ -375,17 +375,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     if (x >= buttonX && x <= buttonX + 50)
                     {
                         wstring copyText = records[i].content;
-                        if (!copyText.empty ())
-                        {
-                            OpenClipboard (hWnd);
-                            EmptyClipboard ();
-                            HGLOBAL hMem = GlobalAlloc (GMEM_MOVEABLE, (copyText.length () + 1) * sizeof (wchar_t));
-                            wchar_t* pMem = (wchar_t*)GlobalLock (hMem);
-                            wcscpy_s (pMem, copyText.length () + 1, copyText.c_str ());
-                            GlobalUnlock (hMem);
-                            SetClipboardData (CF_UNICODETEXT, hMem);
-                            CloseClipboard ();
-                        }
+                        G_ClipManager.CopyToClipboard (copyText);
                         return 0;
                     }
 
@@ -429,17 +419,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 // 点击卡片本身，复制内容
                 wstring copyText = records[i].content;
-                if (!copyText.empty ())
-                {
-                    OpenClipboard (hWnd);
-                    EmptyClipboard ();
-                    HGLOBAL hMem = GlobalAlloc (GMEM_MOVEABLE, (copyText.length () + 1) * sizeof (wchar_t));
-                    wchar_t* pMem = (wchar_t*)GlobalLock (hMem);
-                    wcscpy_s (pMem, copyText.length () + 1, copyText.c_str ());
-                    GlobalUnlock (hMem);
-                    SetClipboardData (CF_UNICODETEXT, hMem);
-                    CloseClipboard ();
-                }
+                G_ClipManager.CopyToClipboard (copyText);
 
                 break;
             }

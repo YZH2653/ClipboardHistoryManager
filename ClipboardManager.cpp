@@ -13,7 +13,7 @@ using namespace std;
 
 // 构造函数
 ClipboardManager::ClipboardManager ()
-    : m_hWnd (NULL), m_nextId (1)
+    : m_hWnd (NULL), m_nextId (1), m_isListening (true)
 {
 }
 
@@ -44,9 +44,69 @@ void ClipboardManager::SetRootDir (const wstring& rootDir)
     m_rootDir = rootDir;
 }
 
+// 暂停/恢复监听
+void ClipboardManager::SetListening (bool listening)
+{
+    m_isListening = listening;
+}
+
+// 复制内容到剪贴板
+bool ClipboardManager::CopyToClipboard (const wstring& content)
+{
+    if (content.empty ())
+    {
+        return false;
+    }
+
+    // 暂停监听，防止重复记录
+    SetListening (false);
+
+    // 打开剪贴板
+    if (!OpenClipboard (m_hWnd))
+    {
+        SetListening (true);
+        return false;
+    }
+
+    // 清空剪贴板
+    EmptyClipboard ();
+
+    // 分配内存
+    HGLOBAL hMem = GlobalAlloc (GMEM_MOVEABLE, (content.length () + 1) * sizeof (wchar_t));
+    if (hMem == NULL)
+    {
+        CloseClipboard ();
+        SetListening (true);
+        return false;
+    }
+
+    // 复制内容
+    wchar_t* pMem = (wchar_t*)GlobalLock (hMem);
+    wcscpy_s (pMem, content.length () + 1, content.c_str ());
+    GlobalUnlock (hMem);
+
+    // 设置剪贴板数据
+    SetClipboardData (CF_UNICODETEXT, hMem);
+
+    // 关闭剪贴板
+    CloseClipboard ();
+
+    // 恢复监听
+    SetListening (true);
+
+    wcout << L"已复制到剪贴板" << endl;
+    return true;
+}
+
 // 处理剪贴板更新
 bool ClipboardManager::OnClipboardUpdate ()
 {
+    // 如果暂停监听，跳过处理
+    if (!m_isListening)
+    {
+        return false;
+    }
+
     // 检查是否为文字内容
     if (IsClipboardFormatAvailable (CF_UNICODETEXT))
     {
@@ -117,6 +177,12 @@ bool ClipboardManager::CaptureText ()
 
     // 关闭剪贴板
     CloseClipboard ();
+
+    // 检查是否与最后一条记录相同（避免重复）
+    if (!m_records.empty () && m_records[0].content == record.content)
+    {
+        return false;
+    }
 
     // 添加记录
     AddRecord (record);
