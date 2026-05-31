@@ -108,12 +108,15 @@ bool ClipboardManager::IsDuplicate (const wstring& content)
         return false;
     }
 
-    // 检查是否与最近一条记录相同
-    const ClipRecord& last = m_records[0];
-    if (last.type == CLIP_TEXT && last.content == content)
+    // 检查是否与最近5条记录中的任意一条相同（防止短时间内重复）
+    int checkCount = min (5, (int)m_records.size ());
+    for (int i = 0; i < checkCount; i++)
     {
-        wcout << L"内容与上一条记录重复，跳过捕获" << endl;
-        return true;
+        if (m_records[i].type == CLIP_TEXT && m_records[i].content == content)
+        {
+            wcout << L"内容与最近记录重复，跳过捕获" << endl;
+            return true;
+        }
     }
 
     return false;
