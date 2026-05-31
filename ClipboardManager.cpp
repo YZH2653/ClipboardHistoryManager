@@ -50,6 +50,59 @@ void ClipboardManager::SetListening (bool listening)
     m_isListening = listening;
 }
 
+// 校验内容合法性
+bool ClipboardManager::IsValidContent (const wstring& content)
+{
+    // 过滤空内容
+    if (content.empty ())
+    {
+        return false;
+    }
+
+    // 过滤过短内容（少于2个字符）
+    if (content.length () < 2)
+    {
+        return false;
+    }
+
+    // 过滤系统命令和错误信息
+    wstring lowerContent = content;
+    transform (lowerContent.begin (), lowerContent.end (), lowerContent.begin (), ::towlower);
+
+    // 过滤PowerShell错误信息
+    if (lowerContent.find (L"out-null") != wstring::npos ||
+        lowerContent.find (L"command") != wstring::npos ||
+        lowerContent.find (L"error") != wstring::npos ||
+        lowerContent.find (L"failed") != wstring::npos)
+    {
+        return false;
+    }
+
+    // 过滤系统路径和命令
+    if (lowerContent.find (L"c:\\windows") != wstring::npos ||
+        lowerContent.find (L"c:/windows") != wstring::npos ||
+        lowerContent.find (L"system32") != wstring::npos)
+    {
+        return false;
+    }
+
+    // 过滤乱码内容（包含大量非打印字符）
+    int nonPrintableCount = 0;
+    for (wchar_t ch : content)
+    {
+        if (ch < 32 && ch != L'\n' && ch != L'\r' && ch != L'\t')
+        {
+            nonPrintableCount++;
+        }
+    }
+    if (nonPrintableCount > content.length () / 10)
+    {
+        return false;
+    }
+
+    return true;
+}
+
 // 复制内容到剪贴板
 bool ClipboardManager::CopyToClipboard (const wstring& content)
 {
@@ -156,11 +209,33 @@ bool ClipboardManager::CaptureText ()
         length = 10000;
     }
 
+    // 创建内容字符串
+    wstring content (pText, length);
+
+    // 解锁内存
+    GlobalUnlock (hData);
+
+    // 关闭剪贴板
+    CloseClipboard ();
+
+    // 校验内容合法性
+    if (!IsValidContent (content))
+    {
+        wcout << L"过滤无效内容: " << content.substr (0, 50) << endl;
+        return false;
+    }
+
+    // 检查是否与最后一条记录相同（避免重复）
+    if (!m_records.empty () && m_records[0].content == content)
+    {
+        return false;
+    }
+
     // 创建记录
     ClipRecord record;
     record.id = GenerateId ();
     record.type = CLIP_TEXT;
-    record.content = wstring (pText, length);
+    record.content = content;
     record.timestamp = time (NULL);
     record.isPinned = false;
 
@@ -170,18 +245,6 @@ bool ClipboardManager::CaptureText ()
     if ((int)record.content.length () > 100)
     {
         record.preview += L"...";
-    }
-
-    // 解锁内存
-    GlobalUnlock (hData);
-
-    // 关闭剪贴板
-    CloseClipboard ();
-
-    // 检查是否与最后一条记录相同（避免重复）
-    if (!m_records.empty () && m_records[0].content == record.content)
-    {
-        return false;
     }
 
     // 添加记录

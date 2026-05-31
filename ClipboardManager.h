@@ -69,6 +69,9 @@ private:
     // 生成唯一ID
     int GenerateId ();
 
+    // 校验内容合法性
+    bool IsValidContent (const wstring& content);
+
     HWND m_hWnd;              // 窗口句柄
     wstring m_rootDir;        // 程序根目录
     vector<ClipRecord> m_records;  // 历史记录
