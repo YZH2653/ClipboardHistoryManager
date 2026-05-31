@@ -1,4 +1,32 @@
 {
-    "records": [],
+    "records": [
+        {
+            "content": "你前面注释掉了UI管理器，如果要用的话，那就继续写，如果不要用了，那就删除，优化一下代码",
+            "filePath": "",
+            "id": 3,
+            "isPinned": false,
+            "preview": "你前面注释掉了UI管理器，如果要用的话，那就继续写，如果不要用了，那就删除，优化一下代码",
+            "timestamp": 1780224981,
+            "type": 0
+        },
+        {
+            "content": "efine _WIN32_WINNT 0x0601\r\n#include <windows.h>\r\n#include <iostream>\r\n#include <fstream>\r\n#include <alg",
+            "filePath": "",
+            "id": 2,
+            "isPinned": false,
+            "preview": "efine _WIN32_WINNT 0x0601\r\n#include <windows.h>\r\n#include <iostream>\r\n#include <fstream>\r\n#include <...",
+            "timestamp": 1780224945,
+            "type": 0
+        },
+        {
+            "content": "\r\n// 窗口类名\r\nconst wchar_t* CLASS_NAME = L\"ClipboardHistoryClass\";\r\n\r\n// 全局对象\r\nClipboardManager G_ClipManager;\r\nStorage G_Storage;\r\n// UIManager G_UIManager;  // 暂时注释UI管理器\r\n\r\n// 设置参数\r\nint G_RetentionDays = 3; ",
+            "filePath": "",
+            "id": 1,
+            "isPinned": false,
+            "preview": "\r\n// 窗口类名\r\nconst wchar_t* CLASS_NAME = L\"ClipboardHistoryClass\";\r\n\r\n// 全局对象\r\nClipboardManager G_Clip...",
+            "timestamp": 1780224942,
+            "type": 0
+        }
+    ],
     "version": "1.0"
 }

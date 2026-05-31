@@ -8,7 +8,6 @@
 #include <algorithm>
 #include "ClipboardManager.h"
 #include "Storage.h"
-// #include "UIManager.h"  // 暂时注释UI管理器
 using namespace std;
 
 // 窗口类名
@@ -17,7 +16,6 @@ const wchar_t* CLASS_NAME = L"ClipboardHistoryClass";
 // 全局对象
 ClipboardManager G_ClipManager;
 Storage G_Storage;
-// UIManager G_UIManager;  // 暂时注释UI管理器
 
 // 设置参数
 int G_RetentionDays = 3;    // 保留天数
