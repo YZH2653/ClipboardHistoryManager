@@ -27,6 +27,8 @@ int G_MaxRecords = 1000;    // 最大记录数
 wstring G_SearchText;       // 搜索文本
 int G_ScrollOffset = 0;     // 滚动偏移量
 int G_HoverIndex = -1;      // 鼠标悬停的卡片索引
+bool G_SearchFocused = false;  // 搜索框是否获得焦点
+int G_CursorPos = 0;        // 光标位置
 
 // 窗口尺寸
 int G_WindowWidth = 800;
@@ -47,6 +49,95 @@ wstring GetExeDir ()
 }
 
 // 获取筛选后的记录（置顶优先，时间倒序）
+// 检查搜索文本是否匹配时间
+bool MatchTimeFilter (const wstring& searchText, time_t timestamp)
+{
+    // 转换时间为字符串
+    struct tm timeInfo;
+    localtime_s (&timeInfo, &timestamp);
+
+    // 格式化日期：YYYY-MM-DD
+    wchar_t dateStr[20];
+    wcsftime (dateStr, 20, L"%Y-%m-%d", &timeInfo);
+
+    // 格式化日期：MM-DD
+    wchar_t shortDateStr[10];
+    wcsftime (shortDateStr, 10, L"%m-%d", &timeInfo);
+
+    // 格式化时间：HH:MM
+    wchar_t timeStr[10];
+    wcsftime (timeStr, 10, L"%H:%M", &timeInfo);
+
+    // 格式化年月：YYYY-MM
+    wchar_t yearMonthStr[10];
+    wcsftime (yearMonthStr, 10, L"%Y-%m", &timeInfo);
+
+    // 检查是否匹配日期格式（YYYY-MM-DD）
+    if (searchText.length () == 10 && searchText[4] == L'-' && searchText[7] == L'-')
+    {
+        return wcsstr (dateStr, searchText.c_str ()) != NULL;
+    }
+
+    // 检查是否匹配短日期格式（MM-DD）
+    if (searchText.length () == 5 && searchText[2] == L'-')
+    {
+        return wcsstr (shortDateStr, searchText.c_str ()) != NULL;
+    }
+
+    // 检查是否匹配时间格式（HH:MM）
+    if (searchText.length () == 5 && searchText[2] == L':')
+    {
+        return wcsstr (timeStr, searchText.c_str ()) != NULL;
+    }
+
+    // 检查是否匹配年月格式（YYYY-MM）
+    if (searchText.length () == 7 && searchText[4] == L'-')
+    {
+        return wcsstr (yearMonthStr, searchText.c_str ()) != NULL;
+    }
+
+    // 检查是否只包含数字（可能是年份、月份、日期、小时）
+    bool isNumber = true;
+    for (wchar_t ch : searchText)
+    {
+        if (!iswdigit (ch) && ch != L'-')
+        {
+            isNumber = false;
+            break;
+        }
+    }
+
+    if (isNumber)
+    {
+        // 尝试匹配年份
+        if (searchText.length () == 4)
+        {
+            wchar_t yearStr[6];
+            wcsftime (yearStr, 6, L"%Y", &timeInfo);
+            return wcsstr (yearStr, searchText.c_str ()) != NULL;
+        }
+
+        // 尝试匹配月份
+        if (searchText.length () == 2 || searchText.length () == 1)
+        {
+            wchar_t monthStr[4];
+            wcsftime (monthStr, 4, L"%m", &timeInfo);
+            return wcsstr (monthStr, searchText.c_str ()) != NULL;
+        }
+
+        // 尝试匹配日期
+        if (searchText.length () == 2 || searchText.length () == 1)
+        {
+            wchar_t dayStr[4];
+            wcsftime (dayStr, 4, L"%d", &timeInfo);
+            return wcsstr (dayStr, searchText.c_str ()) != NULL;
+        }
+    }
+
+    return false;
+}
+
+// 获取筛选后的记录（置顶优先，时间倒序）
 vector<ClipRecord> GetFilteredRecords ()
 {
     vector<ClipRecord> result;
@@ -57,8 +148,12 @@ vector<ClipRecord> GetFilteredRecords ()
         // 搜索过滤
         if (!G_SearchText.empty ())
         {
-            if (record.preview.find (G_SearchText) == wstring::npos &&
-                record.content.find (G_SearchText) == wstring::npos)
+            bool textMatch = (record.preview.find (G_SearchText) != wstring::npos ||
+                             record.content.find (G_SearchText) != wstring::npos);
+            bool timeMatch = MatchTimeFilter (G_SearchText, record.timestamp);
+
+            // 文字搜索或时间搜索
+            if (!textMatch && !timeMatch)
             {
                 continue;
             }
@@ -83,41 +178,64 @@ vector<ClipRecord> GetFilteredRecords ()
 void DrawSearchBox (HDC hdc, int x, int y, int width)
 {
     // 绘制背景
-    HBRUSH bgBrush = CreateSolidBrush (RGB (245, 245, 245));
-    RECT bgRect = { x, y, x + width, y + 35 };
+    COLORREF bgColor = G_SearchFocused ? RGB (255, 255, 255) : RGB (245, 245, 245);
+    HBRUSH bgBrush = CreateSolidBrush (bgColor);
+    RECT bgRect = { x, y, x + width, y + 40 };
     FillRect (hdc, &bgRect, bgBrush);
     DeleteObject (bgBrush);
 
-    // 绘制边框
-    HPEN borderPen = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
+    // 绘制边框（获得焦点时高亮）
+    COLORREF borderColor = G_SearchFocused ? RGB (100, 149, 237) : RGB (200, 200, 200);
+    HPEN borderPen = CreatePen (PS_SOLID, 2, borderColor);
     SelectObject (hdc, borderPen);
-    Rectangle (hdc, x, y, x + width, y + 35);
+    Rectangle (hdc, x, y, x + width, y + 40);
     DeleteObject (borderPen);
 
     // 绘制搜索图标
     SetTextColor (hdc, RGB (150, 150, 150));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT iconFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Segoe UI Emoji");
+    HFONT iconFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Segoe UI Emoji");
     SelectObject (hdc, iconFont);
-    TextOut (hdc, x + 10, y + 8, L"🔍", 1);
+    TextOut (hdc, x + 12, y + 10, L"🔍", 1);
     DeleteObject (iconFont);
 
     // 绘制输入文本
-    HFONT inputFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT inputFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, inputFont);
 
-    if (G_SearchText.empty ())
+    if (G_SearchText.empty () && !G_SearchFocused)
     {
         SetTextColor (hdc, RGB (180, 180, 180));
-        TextOut (hdc, x + 35, y + 9, L"搜索历史记录...", 7);
+        TextOut (hdc, x + 40, y + 12, L"搜索历史记录...", 7);
     }
     else
     {
         SetTextColor (hdc, RGB (33, 33, 33));
-        TextOut (hdc, x + 35, y + 9, G_SearchText.c_str (), G_SearchText.length ());
+        TextOut (hdc, x + 40, y + 12, G_SearchText.c_str (), G_SearchText.length ());
     }
 
     DeleteObject (inputFont);
+
+    // 绘制光标（获得焦点时显示）
+    if (G_SearchFocused)
+    {
+        // 计算光标位置
+        SIZE textSize = { 0, 0 };
+        if (!G_SearchText.empty ())
+        {
+            HFONT tempFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+            SelectObject (hdc, tempFont);
+            GetTextExtentPoint32 (hdc, G_SearchText.c_str (), G_SearchText.length (), &textSize);
+            DeleteObject (tempFont);
+        }
+
+        // 绘制光标竖线
+        HPEN cursorPen = CreatePen (PS_SOLID, 2, RGB (33, 33, 33));
+        SelectObject (hdc, cursorPen);
+        MoveToEx (hdc, x + 40 + textSize.cx + 2, y + 8, NULL);
+        LineTo (hdc, x + 40 + textSize.cx + 2, y + 32);
+        DeleteObject (cursorPen);
+    }
 }
 
 // 绘制按钮
@@ -139,7 +257,7 @@ void DrawButton (HDC hdc, int x, int y, int width, int height, const wstring& te
     // 绘制文字
     SetTextColor (hdc, RGB (80, 80, 80));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT btnFont = CreateFont (12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT btnFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, btnFont);
 
     SIZE textSize;
@@ -157,7 +275,7 @@ void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool 
     // 绘制卡片背景
     COLORREF bgColor = isHovered ? RGB (245, 248, 255) : RGB (255, 255, 255);
     HBRUSH cardBg = CreateSolidBrush (bgColor);
-    RECT cardRect = { x, y, x + width, y + 80 };
+    RECT cardRect = { x, y, x + width, y + 100 };
     FillRect (hdc, &cardRect, cardBg);
     DeleteObject (cardBg);
 
@@ -165,13 +283,13 @@ void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool 
     COLORREF borderColor = isHovered ? RGB (100, 149, 237) : RGB (220, 220, 220);
     HPEN borderPen = CreatePen (PS_SOLID, 1, borderColor);
     SelectObject (hdc, borderPen);
-    Rectangle (hdc, x, y, x + width, y + 80);
+    Rectangle (hdc, x, y, x + width, y + 100);
     DeleteObject (borderPen);
 
     // 绘制左侧彩色条
     COLORREF accentColor = record.isPinned ? RGB (255, 165, 0) : RGB (100, 149, 237);
     HBRUSH accentBrush = CreateSolidBrush (accentColor);
-    RECT accentRect = { x, y, x + 4, y + 80 };
+    RECT accentRect = { x, y, x + 4, y + 100 };
     FillRect (hdc, &accentRect, accentBrush);
     DeleteObject (accentBrush);
 
@@ -179,15 +297,15 @@ void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool 
     int contentX = x + 15;
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT contentFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT contentFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, contentFont);
 
     wstring preview = record.preview;
-    if (preview.length () > 50)
+    if (preview.length () > 60)
     {
-        preview = preview.substr (0, 50) + L"...";
+        preview = preview.substr (0, 60) + L"...";
     }
-    TextOut (hdc, contentX, y + 10, preview.c_str (), preview.length ());
+    TextOut (hdc, contentX, y + 12, preview.c_str (), preview.length ());
     DeleteObject (contentFont);
 
     // 绘制时间
@@ -195,26 +313,26 @@ void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool 
     struct tm timeInfo;
     localtime_s (&timeInfo, &timestamp);
     wchar_t timeStr[32];
-    wcsftime (timeStr, 32, L"%m-%d %H:%M", &timeInfo);
+    wcsftime (timeStr, 32, L"%Y-%m-%d %H:%M", &timeInfo);
     SetTextColor (hdc, RGB (150, 150, 150));
-    HFONT timeFont = CreateFont (12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT timeFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, timeFont);
-    TextOut (hdc, contentX, y + 55, timeStr, wcslen (timeStr));
+    TextOut (hdc, contentX, y + 65, timeStr, wcslen (timeStr));
     DeleteObject (timeFont);
 
     // 绘制操作按钮
-    int buttonY = y + 80 - 28;
-    int buttonX = x + width - 180;
+    int buttonY = y + 100 - 32;
+    int buttonX = x + width - 200;
 
     // 复制按钮
-    DrawButton (hdc, buttonX, buttonY, 50, 22, L"复制", false);
+    DrawButton (hdc, buttonX, buttonY, 55, 26, L"复制", false);
 
     // 置顶按钮
     wstring pinText = record.isPinned ? L"取消" : L"置顶";
-    DrawButton (hdc, buttonX + 58, buttonY, 50, 22, pinText, false);
+    DrawButton (hdc, buttonX + 65, buttonY, 55, 26, pinText, false);
 
     // 删除按钮
-    DrawButton (hdc, buttonX + 116, buttonY, 50, 22, L"删除", false);
+    DrawButton (hdc, buttonX + 130, buttonY, 55, 26, L"删除", false);
 }
 
 // 窗口过程函数
@@ -222,6 +340,15 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
+    case WM_GETMINMAXINFO:
+    {
+        // 设置窗口最小尺寸
+        MINMAXINFO* mmi = (MINMAXINFO*)lParam;
+        mmi->ptMinTrackSize.x = 500;   // 最小宽度
+        mmi->ptMinTrackSize.y = 400;   // 最小高度
+        return 0;
+    }
+
     case WM_SIZE:
     {
         // 窗口大小改变时更新尺寸
@@ -277,26 +404,26 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         // 绘制标题
         SetTextColor (hdc, RGB (33, 33, 33));
         SetBkMode (hdc, TRANSPARENT);
-        HFONT titleFont = CreateFont (18, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+        HFONT titleFont = CreateFont (24, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
         SelectObject (hdc, titleFont);
         TextOut (hdc, 20, 12, L"历史剪贴板管理器", 8);
         DeleteObject (titleFont);
 
         // 绘制搜索框
-        DrawSearchBox (hdc, 20, 45, searchWidth);
+        DrawSearchBox (hdc, 20, 50, searchWidth);
 
         // 绘制分割线
         HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
         SelectObject (hdc, linePen);
-        MoveToEx (hdc, 20, 90, NULL);
-        LineTo (hdc, 20 + searchWidth, 90);
+        MoveToEx (hdc, 20, 100, NULL);
+        LineTo (hdc, 20 + searchWidth, 100);
         DeleteObject (linePen);
 
         // 绘制历史记录列表
         vector<ClipRecord> records = GetFilteredRecords ();
-        int cardY = 100 - G_ScrollOffset;
-        int cardHeight = 80;
-        int cardMargin = 8;
+        int cardY = 110 - G_ScrollOffset;
+        int cardHeight = 100;
+        int cardMargin = 10;
 
         for (int i = 0; i < (int)records.size (); i++)
         {
@@ -322,11 +449,11 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         // 如果没有记录，显示提示
         if (records.empty ())
         {
-            HFONT hintFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+            HFONT hintFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
             SelectObject (hdc, hintFont);
             SetTextColor (hdc, RGB (150, 150, 150));
             wstring hintText = G_SearchText.empty () ? L"暂无历史记录，请复制内容测试" : L"未找到匹配的记录";
-            TextOut (hdc, G_WindowWidth / 2 - 100, G_WindowHeight / 2, hintText.c_str (), hintText.length ());
+            TextOut (hdc, G_WindowWidth / 2 - 120, G_WindowHeight / 2, hintText.c_str (), hintText.length ());
             DeleteObject (hintFont);
         }
 
@@ -340,9 +467,9 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         int y = HIWORD (lParam);
 
         // 计算鼠标所在的卡片索引
-        int cardY = 100 - G_ScrollOffset;
-        int cardHeight = 80;
-        int cardMargin = 8;
+        int cardY = 110 - G_ScrollOffset;
+        int cardHeight = 100;
+        int cardMargin = 10;
         vector<ClipRecord> records = GetFilteredRecords ();
         G_HoverIndex = -1;
 
@@ -367,16 +494,18 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         int y = HIWORD (lParam);
 
         // 检查是否点击了搜索框
-        if (y >= 45 && y < 80 && x >= 20 && x <= G_WindowWidth - 20)
+        if (y >= 50 && y < 90 && x >= 20 && x <= G_WindowWidth - 20)
         {
+            G_SearchFocused = true;
             SetFocus (hWnd);
+            InvalidateRect (hWnd, NULL, TRUE);
             return 0;
         }
 
         // 检查是否点击了卡片
-        int cardY = 100 - G_ScrollOffset;
-        int cardHeight = 80;
-        int cardMargin = 8;
+        int cardY = 110 - G_ScrollOffset;
+        int cardHeight = 100;
+        int cardMargin = 10;
         vector<ClipRecord> records = GetFilteredRecords ();
 
         for (int i = 0; i < (int)records.size (); i++)
@@ -384,13 +513,13 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (y >= cardY && y < cardY + cardHeight && x >= 20 && x <= G_WindowWidth - 20)
             {
                 // 检查是否点击了按钮
-                int buttonX = 20 + G_WindowWidth - 40 - 180;
-                int buttonY = cardY + cardHeight - 28;
+                int buttonX = 20 + G_WindowWidth - 40 - 200;
+                int buttonY = cardY + cardHeight - 32;
 
-                if (y >= buttonY && y <= buttonY + 22)
+                if (y >= buttonY && y <= buttonY + 26)
                 {
                     // 复制按钮
-                    if (x >= buttonX && x <= buttonX + 50)
+                    if (x >= buttonX && x <= buttonX + 55)
                     {
                         wstring copyText = records[i].content;
                         G_ClipManager.CopyToClipboard (copyText);
@@ -398,7 +527,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
 
                     // 置顶按钮
-                    if (x >= buttonX + 58 && x <= buttonX + 108)
+                    if (x >= buttonX + 65 && x <= buttonX + 120)
                     {
                         int recordId = records[i].id;
                         vector<ClipRecord>& allRecords = const_cast<vector<ClipRecord>&> (G_ClipManager.GetRecords ());
@@ -416,7 +545,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
 
                     // 删除按钮
-                    if (x >= buttonX + 116 && x <= buttonX + 166)
+                    if (x >= buttonX + 130 && x <= buttonX + 185)
                     {
                         int recordId = records[i].id;
                         vector<ClipRecord>& allRecords = const_cast<vector<ClipRecord>&> (G_ClipManager.GetRecords ());
@@ -439,10 +568,16 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 wstring copyText = records[i].content;
                 G_ClipManager.CopyToClipboard (copyText);
 
+                // 取消搜索框焦点
+                G_SearchFocused = false;
+
                 break;
             }
             cardY += cardHeight + cardMargin;
         }
+
+        // 点击其他地方，取消搜索框焦点
+        G_SearchFocused = false;
 
         return 0;
     }
@@ -454,7 +589,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         G_ScrollOffset -= delta / 3;
 
         // 限制滚动范围
-        int maxScroll = max (0, (int)GetFilteredRecords ().size () * 88 - (G_WindowHeight - 120));
+        int maxScroll = max (0, (int)GetFilteredRecords ().size () * 110 - (G_WindowHeight - 130));
         G_ScrollOffset = max (0, min (G_ScrollOffset, maxScroll));
 
         InvalidateRect (hWnd, NULL, TRUE);
@@ -463,6 +598,12 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_CHAR:
     {
+        // 只有搜索框获得焦点时才处理键盘输入
+        if (!G_SearchFocused)
+        {
+            return 0;
+        }
+
         wchar_t ch = (wchar_t)wParam;
 
         if (ch == VK_BACK)
@@ -485,6 +626,12 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_KEYDOWN:
     {
+        // 只有搜索框获得焦点时才处理键盘输入
+        if (!G_SearchFocused)
+        {
+            return 0;
+        }
+
         int keyCode = (int)wParam;
 
         if (keyCode == VK_BACK)
@@ -499,15 +646,15 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         else if (keyCode == VK_DOWN)
         {
             // 向下滚动
-            G_ScrollOffset += 30;
-            int maxScroll = max (0, (int)GetFilteredRecords ().size () * 88 - (G_WindowHeight - 120));
+            G_ScrollOffset += 40;
+            int maxScroll = max (0, (int)GetFilteredRecords ().size () * 110 - (G_WindowHeight - 130));
             G_ScrollOffset = min (G_ScrollOffset, maxScroll);
             InvalidateRect (hWnd, NULL, TRUE);
         }
         else if (keyCode == VK_UP)
         {
             // 向上滚动
-            G_ScrollOffset -= 30;
+            G_ScrollOffset -= 40;
             G_ScrollOffset = max (0, G_ScrollOffset);
             InvalidateRect (hWnd, NULL, TRUE);
         }
@@ -574,7 +721,7 @@ int main ()
         CLASS_NAME,
         L"历史剪贴板管理器",
         WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
+        CW_USEDEFAULT, CW_USEDEFAULT, 900, 700,
         NULL, NULL, hInstance, NULL
     );
 
