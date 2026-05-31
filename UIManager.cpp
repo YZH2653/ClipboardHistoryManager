@@ -10,7 +10,7 @@ using namespace std;
 // 构造函数
 UIManager::UIManager ()
     : m_hWnd (NULL), m_clipManager (NULL), m_hoverCardIndex (-1),
-      m_hoverButtonIndex (-1), m_scrollOffset (0)
+      m_scrollOffset (0), m_selectedRecordId (-1), m_operationType (0)
 {
 }
 
@@ -256,7 +256,7 @@ void UIManager::DrawTextWithWrap (HDC hdc, const wstring& text, int x, int y, in
     TextOut (hdc, x, y, displayText.c_str (), displayText.length ());
 }
 
-// 获取筛选后的记录
+// 获取筛选后的记录（置顶的排在前面）
 vector<ClipRecord> UIManager::GetFilteredRecords ()
 {
     if (!m_clipManager)
@@ -267,37 +267,48 @@ vector<ClipRecord> UIManager::GetFilteredRecords ()
     const vector<ClipRecord>& allRecords = m_clipManager->GetRecords ();
 
     // 如果搜索框为空，返回所有记录
+    vector<ClipRecord> result;
     if (m_searchText.empty ())
     {
-        return allRecords;
+        result = allRecords;
     }
-
-    // 筛选包含搜索文本的记录
-    vector<ClipRecord> filtered;
-    for (const auto& record : allRecords)
+    else
     {
-        // 搜索预览文本
-        if (record.preview.find (m_searchText) != wstring::npos)
+        // 筛选包含搜索文本的记录
+        for (const auto& record : allRecords)
         {
-            filtered.push_back (record);
-            continue;
-        }
+            // 搜索预览文本
+            if (record.preview.find (m_searchText) != wstring::npos)
+            {
+                result.push_back (record);
+                continue;
+            }
 
-        // 搜索完整内容（仅文字类型）
-        if (record.type == CLIP_TEXT && record.content.find (m_searchText) != wstring::npos)
-        {
-            filtered.push_back (record);
+            // 搜索完整内容（仅文字类型）
+            if (record.type == CLIP_TEXT && record.content.find (m_searchText) != wstring::npos)
+            {
+                result.push_back (record);
+            }
         }
     }
 
-    return filtered;
+    // 排序：置顶的排在前面，然后按时间降序
+    sort (result.begin (), result.end (), [] (const ClipRecord& a, const ClipRecord& b)
+    {
+        if (a.isPinned != b.isPinned)
+        {
+            return a.isPinned > b.isPinned;
+        }
+        return a.timestamp > b.timestamp;
+    });
+
+    return result;
 }
 
 // 处理鼠标移动
 void UIManager::OnMouseMove (int x, int y)
 {
     m_hoverCardIndex = -1;
-    m_hoverButtonIndex = -1;
 
     // 计算鼠标所在的卡片
     int cardY = 55 + SEARCH_BOX_HEIGHT + 20 - m_scrollOffset;
@@ -365,14 +376,16 @@ void UIManager::OnLButtonDown (int x, int y)
             if (x >= buttonX + BUTTON_WIDTH + BUTTON_MARGIN && x < buttonX + (BUTTON_WIDTH + BUTTON_MARGIN) * 2)
             {
                 // 置顶按钮
-                // TODO: 实现置顶功能
+                m_selectedRecordId = records[i].id;
+                m_operationType = 1;  // 置顶操作
                 return;
             }
 
             if (x >= buttonX + (BUTTON_WIDTH + BUTTON_MARGIN) * 2 && x < buttonX + (BUTTON_WIDTH + BUTTON_MARGIN) * 3)
             {
                 // 删除按钮
-                // TODO: 实现删除功能
+                m_selectedRecordId = records[i].id;
+                m_operationType = 2;  // 删除操作
                 return;
             }
 
@@ -440,4 +453,29 @@ void UIManager::ClearSearch ()
 {
     m_searchText.clear ();
     InvalidateRect (m_hWnd, NULL, TRUE);
+}
+
+// 获取选中的记录ID
+int UIManager::GetSelectedRecordId () const
+{
+    return m_selectedRecordId;
+}
+
+// 获取操作类型
+int UIManager::GetOperationType () const
+{
+    return m_operationType;
+}
+
+// 清除操作状态
+void UIManager::ClearOperation ()
+{
+    m_selectedRecordId = -1;
+    m_operationType = 0;
+}
+
+// 获取剪贴板管理器指针
+ClipboardManager* UIManager::GetClipManager () const
+{
+    return m_clipManager;
 }

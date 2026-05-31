@@ -36,6 +36,18 @@ public:
     // 清空搜索框
     void ClearSearch ();
 
+    // 获取选中的记录ID（用于置顶/删除）
+    int GetSelectedRecordId () const;
+
+    // 获取操作类型（0=无, 1=置顶, 2=删除）
+    int GetOperationType () const;
+
+    // 清除操作状态
+    void ClearOperation ();
+
+    // 获取剪贴板管理器指针
+    ClipboardManager* GetClipManager () const;
+
 private:
     // 绘制搜索框
     void DrawSearchBox (HDC hdc, int x, int y, int width);
@@ -52,18 +64,15 @@ private:
     // 获取筛选后的记录
     vector<ClipRecord> GetFilteredRecords ();
 
-    // 检测按钮点击
-    int HitTestButton (int x, int y);
-
-    // 检测卡片点击
-    int HitTestCard (int x, int y);
-
     HWND m_hWnd;                    // 窗口句柄
     ClipboardManager* m_clipManager;  // 剪贴板管理器指针
     wstring m_searchText;           // 搜索框内容
     int m_hoverCardIndex;           // 鼠标悬停的卡片索引
-    int m_hoverButtonIndex;         // 鼠标悬停的按钮索引（0=复制, 1=置顶, 2=删除）
     int m_scrollOffset;             // 滚动偏移量
+
+    // 操作状态
+    int m_selectedRecordId;         // 选中的记录ID
+    int m_operationType;            // 操作类型（0=无, 1=置顶, 2=删除）
 
     // 界面布局常量
     static const int SEARCH_BOX_HEIGHT = 40;

@@ -85,6 +85,48 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         int x = LOWORD (lParam);
         int y = HIWORD (lParam);
         G_UIManager.OnLButtonDown (x, y);
+
+        // 处理置顶操作
+        if (G_UIManager.GetOperationType () == 1)
+        {
+            int recordId = G_UIManager.GetSelectedRecordId ();
+            vector<ClipRecord>& records = const_cast<vector<ClipRecord>&> (G_ClipManager.GetRecords ());
+            for (auto& record : records)
+            {
+                if (record.id == recordId)
+                {
+                    record.isPinned = !record.isPinned;
+                    wcout << L"置顶状态切换: " << record.isPinned << endl;
+                    break;
+                }
+            }
+            G_Storage.SaveRecords (records);
+            G_UIManager.ClearOperation ();
+            InvalidateRect (hWnd, NULL, TRUE);
+        }
+
+        // 处理删除操作
+        if (G_UIManager.GetOperationType () == 2)
+        {
+            int recordId = G_UIManager.GetSelectedRecordId ();
+            vector<ClipRecord>& records = const_cast<vector<ClipRecord>&> (G_ClipManager.GetRecords ());
+            for (auto it = records.begin (); it != records.end (); ++it)
+            {
+                if (it->id == recordId)
+                {
+                    // 删除图片文件
+                    G_Storage.DeleteRecordFile (*it);
+                    // 删除记录
+                    records.erase (it);
+                    wcout << L"删除记录: " << recordId << endl;
+                    break;
+                }
+            }
+            G_Storage.SaveRecords (records);
+            G_UIManager.ClearOperation ();
+            InvalidateRect (hWnd, NULL, TRUE);
+        }
+
         return 0;
     }
 
