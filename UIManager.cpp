@@ -137,7 +137,7 @@ void UIManager::DrawSearchBox (HDC hdc, int x, int y, int width)
 }
 
 // 绘制历史卡片
-void UIManager::DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool isHovered)
+void UIManager::DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool /*isHovered*/)
 {
     // 绘制卡片背景（纯白色）
     HBRUSH cardBg = CreateSolidBrush (RGB (255, 255, 255));
@@ -246,10 +246,10 @@ void UIManager::DrawButton (HDC hdc, int x, int y, int width, int height, const 
 }
 
 // 绘制文字（自动换行）
-void UIManager::DrawTextWithWrap (HDC hdc, const wstring& text, int x, int y, int width, int maxLength)
+void UIManager::DrawTextWithWrap (HDC hdc, const wstring& text, int x, int y, int /*width*/, int maxLength)
 {
     wstring displayText = text;
-    if (displayText.length () > maxLength)
+    if ((int)displayText.length () > maxLength)
     {
         displayText = displayText.substr (0, maxLength) + L"...";
     }
@@ -306,7 +306,7 @@ vector<ClipRecord> UIManager::GetFilteredRecords ()
 }
 
 // 处理鼠标移动
-void UIManager::OnMouseMove (int x, int y)
+void UIManager::OnMouseMove (int /*x*/, int y)
 {
     m_hoverCardIndex = -1;
 
@@ -353,7 +353,6 @@ void UIManager::OnLButtonDown (int x, int y)
             int cardX = CARD_PADDING;
             int cardWidth = clientRect.right - CARD_PADDING * 2;
             int buttonX = cardX + cardWidth - BUTTON_WIDTH * 3 - BUTTON_MARGIN * 2;
-            int buttonY = cardY + CARD_HEIGHT - BUTTON_HEIGHT - 12;
 
             if (x >= buttonX && x < buttonX + BUTTON_WIDTH)
             {
