@@ -21,13 +21,15 @@ Storage G_Storage;
 const wchar_t* APP_VERSION = L"1.1.0.0";
 const wchar_t* APP_UPDATE_DATE = L"2026-06-01";
 const wchar_t* APP_AUTHOR = L"YZH2653";
+const wchar_t* APP_AUTHOR_EMAIL = L"yzh2653@163.com";
 
 // 页面状态
 enum PageState
 {
     PAGE_MAIN,
     PAGE_SETTINGS,
-    PAGE_VERSION
+    PAGE_VERSION,
+    PAGE_FEEDBACK
 };
 PageState G_CurrentPage = PAGE_MAIN;
 
@@ -415,12 +417,21 @@ void DrawSettingsPage (HDC hdc)
     // 绘制箭头
     SetTextColor (hdc, RGB (150, 150, 150));
     TextOut (hdc, G_WindowWidth - 40, versionY, L"→", 1);
+
+    // 问题反馈入口
+    int feedbackY = 210;
+    SetTextColor (hdc, RGB (33, 33, 33));
+    TextOut (hdc, 20, feedbackY, L"问题反馈", 4);
+
+    // 绘制箭头
+    SetTextColor (hdc, RGB (150, 150, 150));
+    TextOut (hdc, G_WindowWidth - 40, feedbackY, L"→", 1);
     DeleteObject (versionFont);
 
     // 绘制分割线
     SelectObject (hdc, linePen);
-    MoveToEx (hdc, 20, versionY + 30, NULL);
-    LineTo (hdc, G_WindowWidth - 20, versionY + 30);
+    MoveToEx (hdc, 20, feedbackY + 30, NULL);
+    LineTo (hdc, G_WindowWidth - 20, feedbackY + 30);
     DeleteObject (linePen);
 }
 
@@ -486,6 +497,64 @@ void DrawVersionPage (HDC hdc)
     SetTextColor (hdc, RGB (33, 33, 33));
     TextOut (hdc, 120, contentY, APP_AUTHOR, wcslen (APP_AUTHOR));
 
+    DeleteObject (contentFont);
+}
+
+// 绘制问题反馈页面
+void DrawFeedbackPage (HDC hdc)
+{
+    // 绘制返回按钮
+    DrawBackButton (hdc, 20, 10, false);
+
+    // 绘制标题
+    SetTextColor (hdc, RGB (33, 33, 33));
+    SetBkMode (hdc, TRANSPARENT);
+    HFONT titleFont = CreateFont (24, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, titleFont);
+    TextOut (hdc, 100, 12, L"问题反馈", 4);
+    DeleteObject (titleFont);
+
+    // 绘制分割线
+    HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
+    SelectObject (hdc, linePen);
+    MoveToEx (hdc, 20, 50, NULL);
+    LineTo (hdc, G_WindowWidth - 20, 50);
+    DeleteObject (linePen);
+
+    // 问题反馈内容
+    int contentY = 70;
+    int lineHeight = 30;
+
+    HFONT contentFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, contentFont);
+
+    // 作者邮箱
+    SetTextColor (hdc, RGB (100, 100, 100));
+    TextOut (hdc, 20, contentY, L"作者邮箱", 4);
+    SetTextColor (hdc, RGB (33, 33, 33));
+    TextOut (hdc, 110, contentY, APP_AUTHOR_EMAIL, wcslen (APP_AUTHOR_EMAIL));
+    contentY += lineHeight + 15;
+
+    // 反馈格式说明
+    SetTextColor (hdc, RGB (33, 33, 33));
+    HFONT hintFont = CreateFont (16, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, hintFont);
+    TextOut (hdc, 20, contentY, L"请按以下格式写:", 8);
+    DeleteObject (hintFont);
+    contentY += lineHeight;
+
+    // 反馈格式内容
+    HFONT formatFont = CreateFont (15, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, formatFont);
+
+    SetTextColor (hdc, RGB (80, 80, 80));
+    TextOut (hdc, 40, contentY, L"软件版本(可在版本号中查看):", 15);
+    contentY += 25;
+    TextOut (hdc, 40, contentY, L"出现问题的时间:", 8);
+    contentY += 25;
+    TextOut (hdc, 40, contentY, L"描述问题(可用图片表示):", 12);
+
+    DeleteObject (formatFont);
     DeleteObject (contentFont);
 }
 
@@ -693,6 +762,11 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             // 版本号页面
             DrawVersionPage (hdc);
         }
+        else if (G_CurrentPage == PAGE_FEEDBACK)
+        {
+            // 问题反馈页面
+            DrawFeedbackPage (hdc);
+        }
 
         EndPaint (hWnd, &ps);
         return 0;
@@ -870,10 +944,30 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 InvalidateRect (hWnd, NULL, TRUE);
                 return 0;
             }
+
+            // 检查是否点击了问题反馈入口
+            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 210 && y <= 240)
+            {
+                G_CurrentPage = PAGE_FEEDBACK;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
         }
         else if (G_CurrentPage == PAGE_VERSION)
         {
             // 版本号页面点击处理
+
+            // 检查是否点击了返回按钮
+            if (x >= 20 && x <= 80 && y >= 8 && y <= 38)
+            {
+                G_CurrentPage = PAGE_SETTINGS;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+        }
+        else if (G_CurrentPage == PAGE_FEEDBACK)
+        {
+            // 问题反馈页面点击处理
 
             // 检查是否点击了返回按钮
             if (x >= 20 && x <= 80 && y >= 8 && y <= 38)
