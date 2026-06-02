@@ -26,7 +26,8 @@ const wchar_t* APP_AUTHOR = L"YZH2653";
 enum PageState
 {
     PAGE_MAIN,
-    PAGE_SETTINGS
+    PAGE_SETTINGS,
+    PAGE_VERSION
 };
 PageState G_CurrentPage = PAGE_MAIN;
 
@@ -403,6 +404,89 @@ void DrawSettingsPage (HDC hdc)
 
         DeleteObject (optionFont);
     }
+
+    // 版本信息入口
+    int versionY = 170;
+    HFONT versionFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, versionFont);
+    SetTextColor (hdc, RGB (33, 33, 33));
+    TextOut (hdc, 20, versionY, L"版本信息", 4);
+
+    // 绘制箭头
+    SetTextColor (hdc, RGB (150, 150, 150));
+    TextOut (hdc, G_WindowWidth - 40, versionY, L"→", 1);
+    DeleteObject (versionFont);
+
+    // 绘制分割线
+    SelectObject (hdc, linePen);
+    MoveToEx (hdc, 20, versionY + 30, NULL);
+    LineTo (hdc, G_WindowWidth - 20, versionY + 30);
+    DeleteObject (linePen);
+}
+
+// 绘制版本号页面
+void DrawVersionPage (HDC hdc)
+{
+    // 绘制返回按钮
+    DrawBackButton (hdc, 20, 10, false);
+
+    // 绘制标题
+    SetTextColor (hdc, RGB (33, 33, 33));
+    SetBkMode (hdc, TRANSPARENT);
+    HFONT titleFont = CreateFont (24, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, titleFont);
+    TextOut (hdc, 100, 12, L"版本信息", 4);
+    DeleteObject (titleFont);
+
+    // 绘制分割线
+    HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
+    SelectObject (hdc, linePen);
+    MoveToEx (hdc, 20, 50, NULL);
+    LineTo (hdc, G_WindowWidth - 20, 50);
+    DeleteObject (linePen);
+
+    // 版本信息内容
+    int contentY = 80;
+    int lineHeight = 35;
+
+    HFONT contentFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, contentFont);
+
+    // 版本号
+    SetTextColor (hdc, RGB (100, 100, 100));
+    TextOut (hdc, 20, contentY, L"版本号", 3);
+    SetTextColor (hdc, RGB (33, 33, 33));
+    TextOut (hdc, 120, contentY, APP_VERSION, wcslen (APP_VERSION));
+    contentY += lineHeight;
+
+    // 更新日期
+    SetTextColor (hdc, RGB (100, 100, 100));
+    TextOut (hdc, 20, contentY, L"更新日期", 4);
+    SetTextColor (hdc, RGB (33, 33, 33));
+    TextOut (hdc, 120, contentY, APP_UPDATE_DATE, wcslen (APP_UPDATE_DATE));
+    contentY += lineHeight;
+
+    // 更新内容
+    SetTextColor (hdc, RGB (100, 100, 100));
+    TextOut (hdc, 20, contentY, L"更新内容", 4);
+    contentY += lineHeight;
+
+    // 更新内容列表
+    SetTextColor (hdc, RGB (33, 33, 33));
+    TextOut (hdc, 40, contentY, L"• 新增设置页面", 7);
+    contentY += 25;
+    TextOut (hdc, 40, contentY, L"• 支持保存时间配置", 9);
+    contentY += 25;
+    TextOut (hdc, 40, contentY, L"• 显示版本信息", 7);
+    contentY += lineHeight + 10;
+
+    // 作者
+    SetTextColor (hdc, RGB (100, 100, 100));
+    TextOut (hdc, 20, contentY, L"作者", 2);
+    SetTextColor (hdc, RGB (33, 33, 33));
+    TextOut (hdc, 120, contentY, APP_AUTHOR, wcslen (APP_AUTHOR));
+
+    DeleteObject (contentFont);
 }
 
 // 绘制卡片
@@ -604,6 +688,11 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             // 设置页面
             DrawSettingsPage (hdc);
         }
+        else if (G_CurrentPage == PAGE_VERSION)
+        {
+            // 版本号页面
+            DrawVersionPage (hdc);
+        }
 
         EndPaint (hWnd, &ps);
         return 0;
@@ -772,6 +861,26 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     InvalidateRect (hWnd, NULL, TRUE);
                     return 0;
                 }
+            }
+
+            // 检查是否点击了版本信息入口
+            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 170 && y <= 200)
+            {
+                G_CurrentPage = PAGE_VERSION;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+        }
+        else if (G_CurrentPage == PAGE_VERSION)
+        {
+            // 版本号页面点击处理
+
+            // 检查是否点击了返回按钮
+            if (x >= 20 && x <= 80 && y >= 8 && y <= 38)
+            {
+                G_CurrentPage = PAGE_SETTINGS;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
             }
         }
 
