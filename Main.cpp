@@ -399,47 +399,6 @@ void DrawSettingsPage (HDC hdc)
     TextOut (hdc, dropdownX + dropdownWidth - 25, dropdownY + 10, L"▼", 1);
     DeleteObject (valueFont);
 
-    // 如果下拉菜单打开，绘制选项列表（在右边）
-    if (G_DropdownOpen)
-    {
-        int optionHeight = 45;
-        int listY = dropdownY + dropdownHeight;
-
-        for (int i = 0; i < RETENTION_COUNT; i++)
-        {
-            int optionY = listY + i * optionHeight;
-            bool isSelected = (i == G_SelectedRetentionIndex);
-
-            // 绘制选项背景
-            COLORREF optBgColor = isSelected ? RGB (100, 149, 237) : RGB (255, 255, 255);
-            HBRUSH optBgBrush = CreateSolidBrush (optBgColor);
-            RECT optBgRect = { dropdownX, optionY, dropdownX + dropdownWidth, optionY + optionHeight };
-            FillRect (hdc, &optBgRect, optBgBrush);
-            DeleteObject (optBgBrush);
-
-            // 绘制边框
-            HPEN optBorderPen = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
-            SelectObject (hdc, optBorderPen);
-            Rectangle (hdc, dropdownX, optionY, dropdownX + dropdownWidth, optionY + optionHeight);
-            DeleteObject (optBorderPen);
-
-            // 绘制文字
-            COLORREF textColor = isSelected ? RGB (255, 255, 255) : RGB (33, 33, 33);
-            SetTextColor (hdc, textColor);
-            SetBkMode (hdc, TRANSPARENT);
-            HFONT optionFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
-            SelectObject (hdc, optionFont);
-
-            SIZE textSize;
-            GetTextExtentPoint32 (hdc, RETENTION_LABELS[i], wcslen (RETENTION_LABELS[i]), &textSize);
-            int textX = dropdownX + (dropdownWidth - textSize.cx) / 2;
-            int textY = optionY + (optionHeight - textSize.cy) / 2;
-            TextOut (hdc, textX, textY, RETENTION_LABELS[i], wcslen (RETENTION_LABELS[i]));
-
-            DeleteObject (optionFont);
-        }
-    }
-
     // 绘制分割线
     SelectObject (hdc, linePen);
     MoveToEx (hdc, 20, 140, NULL);
@@ -491,6 +450,47 @@ void DrawSettingsPage (HDC hdc)
     SetTextColor (hdc, RGB (100, 149, 237));
     TextOut (hdc, 180, githubY, APP_GITHUB_URL, wcslen (APP_GITHUB_URL));
     DeleteObject (githubFont);
+
+    // 最后绘制下拉菜单选项列表（确保在最上层）
+    if (G_DropdownOpen)
+    {
+        int optionHeight = 45;
+        int listY = dropdownY + dropdownHeight;
+
+        for (int i = 0; i < RETENTION_COUNT; i++)
+        {
+            int optionY = listY + i * optionHeight;
+            bool isSelected = (i == G_SelectedRetentionIndex);
+
+            // 绘制选项背景
+            COLORREF optBgColor = isSelected ? RGB (100, 149, 237) : RGB (255, 255, 255);
+            HBRUSH optBgBrush = CreateSolidBrush (optBgColor);
+            RECT optBgRect = { dropdownX, optionY, dropdownX + dropdownWidth, optionY + optionHeight };
+            FillRect (hdc, &optBgRect, optBgBrush);
+            DeleteObject (optBgBrush);
+
+            // 绘制边框
+            HPEN optBorderPen = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
+            SelectObject (hdc, optBorderPen);
+            Rectangle (hdc, dropdownX, optionY, dropdownX + dropdownWidth, optionY + optionHeight);
+            DeleteObject (optBorderPen);
+
+            // 绘制文字
+            COLORREF textColor = isSelected ? RGB (255, 255, 255) : RGB (33, 33, 33);
+            SetTextColor (hdc, textColor);
+            SetBkMode (hdc, TRANSPARENT);
+            HFONT optionFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+            SelectObject (hdc, optionFont);
+
+            SIZE textSize;
+            GetTextExtentPoint32 (hdc, RETENTION_LABELS[i], wcslen (RETENTION_LABELS[i]), &textSize);
+            int textX = dropdownX + (dropdownWidth - textSize.cx) / 2;
+            int textY = optionY + (optionHeight - textSize.cy) / 2;
+            TextOut (hdc, textX, textY, RETENTION_LABELS[i], wcslen (RETENTION_LABELS[i]));
+
+            DeleteObject (optionFont);
+        }
+    }
 }
 
 // 绘制版本号页面
