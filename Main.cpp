@@ -462,8 +462,8 @@ void DrawSettingsPage (HDC hdc)
             int optionY = listY + i * optionHeight;
             bool isSelected = (i == G_SelectedRetentionIndex);
 
-            // 绘制选项背景
-            COLORREF optBgColor = isSelected ? RGB (100, 149, 237) : RGB (255, 255, 255);
+            // 绘制选项背景（当前选中的高亮显示）
+            COLORREF optBgColor = isSelected ? RGB (230, 240, 255) : RGB (255, 255, 255);
             HBRUSH optBgBrush = CreateSolidBrush (optBgColor);
             RECT optBgRect = { dropdownX, optionY, dropdownX + dropdownWidth, optionY + optionHeight };
             FillRect (hdc, &optBgRect, optBgBrush);
@@ -475,8 +475,8 @@ void DrawSettingsPage (HDC hdc)
             Rectangle (hdc, dropdownX, optionY, dropdownX + dropdownWidth, optionY + optionHeight);
             DeleteObject (optBorderPen);
 
-            // 绘制文字
-            COLORREF textColor = isSelected ? RGB (255, 255, 255) : RGB (33, 33, 33);
+            // 绘制文字（当前选中的加一个✓标记）
+            COLORREF textColor = isSelected ? RGB (100, 149, 237) : RGB (33, 33, 33);
             SetTextColor (hdc, textColor);
             SetBkMode (hdc, TRANSPARENT);
             HFONT optionFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
@@ -487,6 +487,12 @@ void DrawSettingsPage (HDC hdc)
             int textX = dropdownX + (dropdownWidth - textSize.cx) / 2;
             int textY = optionY + (optionHeight - textSize.cy) / 2;
             TextOut (hdc, textX, textY, RETENTION_LABELS[i], wcslen (RETENTION_LABELS[i]));
+
+            // 如果是当前选中的，在右边显示✓
+            if (isSelected)
+            {
+                TextOut (hdc, dropdownX + dropdownWidth - 30, textY, L"✓", 1);
+            }
 
             DeleteObject (optionFont);
         }
@@ -1001,10 +1007,19 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     int optionY = listY + i * optionHeight;
                     if (x >= dropdownX && x <= dropdownX + dropdownWidth && y >= optionY && y <= optionY + optionHeight)
                     {
-                        G_SelectedRetentionIndex = i;
-                        G_RetentionDays = RETENTION_OPTIONS[i];
-                        G_Storage.SaveSettings (G_RetentionDays, G_MaxRecords);
-                        G_DropdownOpen = false;
+                        // 点击当前选中的选项，只关闭下拉菜单
+                        if (i == G_SelectedRetentionIndex)
+                        {
+                            G_DropdownOpen = false;
+                        }
+                        else
+                        {
+                            // 点击其他选项，更新设置
+                            G_SelectedRetentionIndex = i;
+                            G_RetentionDays = RETENTION_OPTIONS[i];
+                            G_Storage.SaveSettings (G_RetentionDays, G_MaxRecords);
+                            G_DropdownOpen = false;
+                        }
                         InvalidateRect (hWnd, NULL, TRUE);
                         return 0;
                     }
