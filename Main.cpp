@@ -43,6 +43,7 @@ const int RETENTION_OPTIONS[] = {3, 5, 7, 30, -1};  // -1 表示永久
 const wchar_t* RETENTION_LABELS[] = {L"3天", L"5天", L"7天", L"30天", L"永久"};
 const int RETENTION_COUNT = 5;
 int G_SelectedRetentionIndex = 0;  // 当前选中的保存时间索引
+bool G_DropdownOpen = false;  // 下拉菜单是否打开
 
 // 界面状态
 wstring G_SearchText;       // 搜索文本
@@ -348,7 +349,7 @@ void DrawSettingsPage (HDC hdc)
     // 绘制标题
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT titleFont = CreateFont (24, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT titleFont = CreateFont (28, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, titleFont);
     TextOut (hdc, 100, 12, L"设置", 2);
     DeleteObject (titleFont);
@@ -356,61 +357,92 @@ void DrawSettingsPage (HDC hdc)
     // 绘制分割线
     HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
     SelectObject (hdc, linePen);
-    MoveToEx (hdc, 20, 50, NULL);
-    LineTo (hdc, G_WindowWidth - 20, 50);
+    MoveToEx (hdc, 20, 55, NULL);
+    LineTo (hdc, G_WindowWidth - 20, 55);
     DeleteObject (linePen);
 
     // 保存时间设置
     SetTextColor (hdc, RGB (33, 33, 33));
-    HFONT sectionFont = CreateFont (18, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT sectionFont = CreateFont (20, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, sectionFont);
-    TextOut (hdc, 20, 70, L"保存时间", 4);
+    TextOut (hdc, 20, 80, L"保存时间", 4);
     DeleteObject (sectionFont);
 
-    // 绘制选项卡
-    int optionWidth = 70;
-    int optionHeight = 35;
-    int optionY = 105;
-    int optionSpacing = 10;
+    // 绘制下拉菜单框
+    int dropdownX = 20;
+    int dropdownY = 115;
+    int dropdownWidth = 200;
+    int dropdownHeight = 40;
 
-    for (int i = 0; i < RETENTION_COUNT; i++)
+    // 绘制下拉框背景
+    COLORREF bgColor = RGB (255, 255, 255);
+    HBRUSH bgBrush = CreateSolidBrush (bgColor);
+    RECT bgRect = { dropdownX, dropdownY, dropdownX + dropdownWidth, dropdownY + dropdownHeight };
+    FillRect (hdc, &bgRect, bgBrush);
+    DeleteObject (bgBrush);
+
+    // 绘制边框
+    HPEN borderPen = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
+    SelectObject (hdc, borderPen);
+    Rectangle (hdc, dropdownX, dropdownY, dropdownX + dropdownWidth, dropdownY + dropdownHeight);
+    DeleteObject (borderPen);
+
+    // 绘制当前选中的值
+    SetTextColor (hdc, RGB (33, 33, 33));
+    SetBkMode (hdc, TRANSPARENT);
+    HFONT valueFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, valueFont);
+    TextOut (hdc, dropdownX + 15, dropdownY + 10, RETENTION_LABELS[G_SelectedRetentionIndex], wcslen (RETENTION_LABELS[G_SelectedRetentionIndex]));
+
+    // 绘制下拉箭头
+    SetTextColor (hdc, RGB (100, 100, 100));
+    TextOut (hdc, dropdownX + dropdownWidth - 25, dropdownY + 10, L"▼", 1);
+    DeleteObject (valueFont);
+
+    // 如果下拉菜单打开，绘制选项列表
+    if (G_DropdownOpen)
     {
-        int optionX = 20 + i * (optionWidth + optionSpacing);
-        bool isSelected = (i == G_SelectedRetentionIndex);
+        int optionHeight = 40;
+        int listY = dropdownY + dropdownHeight;
 
-        // 绘制选项背景
-        COLORREF bgColor = isSelected ? RGB (100, 149, 237) : RGB (245, 245, 245);
-        HBRUSH bgBrush = CreateSolidBrush (bgColor);
-        RECT bgRect = { optionX, optionY, optionX + optionWidth, optionY + optionHeight };
-        FillRect (hdc, &bgRect, bgBrush);
-        DeleteObject (bgBrush);
+        for (int i = 0; i < RETENTION_COUNT; i++)
+        {
+            int optionY = listY + i * optionHeight;
+            bool isSelected = (i == G_SelectedRetentionIndex);
 
-        // 绘制边框
-        COLORREF borderColor = isSelected ? RGB (70, 119, 197) : RGB (200, 200, 200);
-        HPEN borderPen = CreatePen (PS_SOLID, 1, borderColor);
-        SelectObject (hdc, borderPen);
-        Rectangle (hdc, optionX, optionY, optionX + optionWidth, optionY + optionHeight);
-        DeleteObject (borderPen);
+            // 绘制选项背景
+            COLORREF optBgColor = isSelected ? RGB (100, 149, 237) : RGB (255, 255, 255);
+            HBRUSH optBgBrush = CreateSolidBrush (optBgColor);
+            RECT optBgRect = { dropdownX, optionY, dropdownX + dropdownWidth, optionY + optionHeight };
+            FillRect (hdc, &optBgRect, optBgBrush);
+            DeleteObject (optBgBrush);
 
-        // 绘制文字
-        COLORREF textColor = isSelected ? RGB (255, 255, 255) : RGB (80, 80, 80);
-        SetTextColor (hdc, textColor);
-        SetBkMode (hdc, TRANSPARENT);
-        HFONT optionFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
-        SelectObject (hdc, optionFont);
+            // 绘制边框
+            HPEN optBorderPen = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
+            SelectObject (hdc, optBorderPen);
+            Rectangle (hdc, dropdownX, optionY, dropdownX + dropdownWidth, optionY + optionHeight);
+            DeleteObject (optBorderPen);
 
-        SIZE textSize;
-        GetTextExtentPoint32 (hdc, RETENTION_LABELS[i], wcslen (RETENTION_LABELS[i]), &textSize);
-        int textX = optionX + (optionWidth - textSize.cx) / 2;
-        int textY = optionY + (optionHeight - textSize.cy) / 2;
-        TextOut (hdc, textX, textY, RETENTION_LABELS[i], wcslen (RETENTION_LABELS[i]));
+            // 绘制文字
+            COLORREF textColor = isSelected ? RGB (255, 255, 255) : RGB (33, 33, 33);
+            SetTextColor (hdc, textColor);
+            SetBkMode (hdc, TRANSPARENT);
+            HFONT optionFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+            SelectObject (hdc, optionFont);
 
-        DeleteObject (optionFont);
+            SIZE textSize;
+            GetTextExtentPoint32 (hdc, RETENTION_LABELS[i], wcslen (RETENTION_LABELS[i]), &textSize);
+            int textX = dropdownX + (dropdownWidth - textSize.cx) / 2;
+            int textY = optionY + (optionHeight - textSize.cy) / 2;
+            TextOut (hdc, textX, textY, RETENTION_LABELS[i], wcslen (RETENTION_LABELS[i]));
+
+            DeleteObject (optionFont);
+        }
     }
 
     // 版本信息入口
-    int versionY = 170;
-    HFONT versionFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    int versionY = 200;
+    HFONT versionFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, versionFont);
     SetTextColor (hdc, RGB (33, 33, 33));
     TextOut (hdc, 20, versionY, L"版本信息", 4);
@@ -420,7 +452,7 @@ void DrawSettingsPage (HDC hdc)
     TextOut (hdc, G_WindowWidth - 40, versionY, L"→", 1);
 
     // 问题反馈入口
-    int feedbackY = 210;
+    int feedbackY = 260;
     SetTextColor (hdc, RGB (33, 33, 33));
     TextOut (hdc, 20, feedbackY, L"问题反馈", 4);
 
@@ -431,13 +463,13 @@ void DrawSettingsPage (HDC hdc)
 
     // 绘制分割线
     SelectObject (hdc, linePen);
-    MoveToEx (hdc, 20, feedbackY + 30, NULL);
-    LineTo (hdc, G_WindowWidth - 20, feedbackY + 30);
+    MoveToEx (hdc, 20, feedbackY + 35, NULL);
+    LineTo (hdc, G_WindowWidth - 20, feedbackY + 35);
     DeleteObject (linePen);
 
     // GitHub 仓库地址
-    int githubY = G_WindowHeight - 50;
-    HFONT githubFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    int githubY = G_WindowHeight - 55;
+    HFONT githubFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, githubFont);
     SetTextColor (hdc, RGB (100, 100, 100));
     SetBkMode (hdc, TRANSPARENT);
@@ -445,7 +477,7 @@ void DrawSettingsPage (HDC hdc)
 
     // 绘制可点击的链接
     SetTextColor (hdc, RGB (100, 149, 237));
-    TextOut (hdc, 130, githubY, APP_GITHUB_URL, wcslen (APP_GITHUB_URL));
+    TextOut (hdc, 150, githubY, APP_GITHUB_URL, wcslen (APP_GITHUB_URL));
     DeleteObject (githubFont);
 }
 
@@ -458,7 +490,7 @@ void DrawVersionPage (HDC hdc)
     // 绘制标题
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT titleFont = CreateFont (24, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT titleFont = CreateFont (28, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, titleFont);
     TextOut (hdc, 100, 12, L"版本信息", 4);
     DeleteObject (titleFont);
@@ -466,15 +498,15 @@ void DrawVersionPage (HDC hdc)
     // 绘制分割线
     HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
     SelectObject (hdc, linePen);
-    MoveToEx (hdc, 20, 50, NULL);
-    LineTo (hdc, G_WindowWidth - 20, 50);
+    MoveToEx (hdc, 20, 55, NULL);
+    LineTo (hdc, G_WindowWidth - 20, 55);
     DeleteObject (linePen);
 
     // 版本信息内容
     int contentY = 80;
-    int lineHeight = 35;
+    int lineHeight = 45;
 
-    HFONT contentFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT contentFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, contentFont);
 
     // 版本号
@@ -499,11 +531,11 @@ void DrawVersionPage (HDC hdc)
     // 更新内容列表
     SetTextColor (hdc, RGB (33, 33, 33));
     TextOut (hdc, 40, contentY, L"• 新增设置页面", 7);
-    contentY += 25;
+    contentY += 30;
     TextOut (hdc, 40, contentY, L"• 支持保存时间配置", 9);
-    contentY += 25;
+    contentY += 30;
     TextOut (hdc, 40, contentY, L"• 显示版本信息", 7);
-    contentY += lineHeight + 10;
+    contentY += lineHeight + 15;
 
     // 作者
     SetTextColor (hdc, RGB (100, 100, 100));
@@ -523,7 +555,7 @@ void DrawFeedbackPage (HDC hdc)
     // 绘制标题
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT titleFont = CreateFont (24, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT titleFont = CreateFont (28, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, titleFont);
     TextOut (hdc, 100, 12, L"问题反馈", 4);
     DeleteObject (titleFont);
@@ -531,41 +563,41 @@ void DrawFeedbackPage (HDC hdc)
     // 绘制分割线
     HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
     SelectObject (hdc, linePen);
-    MoveToEx (hdc, 20, 50, NULL);
-    LineTo (hdc, G_WindowWidth - 20, 50);
+    MoveToEx (hdc, 20, 55, NULL);
+    LineTo (hdc, G_WindowWidth - 20, 55);
     DeleteObject (linePen);
 
     // 问题反馈内容
-    int contentY = 70;
-    int lineHeight = 30;
+    int contentY = 80;
+    int lineHeight = 40;
 
-    HFONT contentFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT contentFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, contentFont);
 
     // 作者邮箱
     SetTextColor (hdc, RGB (100, 100, 100));
     TextOut (hdc, 20, contentY, L"作者邮箱", 4);
     SetTextColor (hdc, RGB (33, 33, 33));
-    TextOut (hdc, 110, contentY, APP_AUTHOR_EMAIL, wcslen (APP_AUTHOR_EMAIL));
-    contentY += lineHeight + 15;
+    TextOut (hdc, 120, contentY, APP_AUTHOR_EMAIL, wcslen (APP_AUTHOR_EMAIL));
+    contentY += lineHeight + 20;
 
     // 反馈格式说明
     SetTextColor (hdc, RGB (33, 33, 33));
-    HFONT hintFont = CreateFont (16, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT hintFont = CreateFont (22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, hintFont);
     TextOut (hdc, 20, contentY, L"请按以下格式写:", 8);
     DeleteObject (hintFont);
     contentY += lineHeight;
 
     // 反馈格式内容
-    HFONT formatFont = CreateFont (15, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT formatFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, formatFont);
 
     SetTextColor (hdc, RGB (80, 80, 80));
     TextOut (hdc, 40, contentY, L"软件版本(可在版本号中查看):", 15);
-    contentY += 25;
+    contentY += 30;
     TextOut (hdc, 40, contentY, L"出现问题的时间:", 8);
-    contentY += 25;
+    contentY += 30;
     TextOut (hdc, 40, contentY, L"描述问题(可用图片表示):", 12);
 
     DeleteObject (formatFont);
@@ -928,48 +960,66 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (x >= 20 && x <= 80 && y >= 8 && y <= 38)
             {
                 G_CurrentPage = PAGE_MAIN;
+                G_DropdownOpen = false;
                 InvalidateRect (hWnd, NULL, TRUE);
                 return 0;
             }
 
-            // 检查是否点击了保存时间选项
-            int optionWidth = 70;
-            int optionHeight = 35;
-            int optionY = 105;
-            int optionSpacing = 10;
+            // 检查是否点击了下拉菜单框
+            int dropdownX = 20;
+            int dropdownY = 115;
+            int dropdownWidth = 200;
+            int dropdownHeight = 40;
 
-            for (int i = 0; i < RETENTION_COUNT; i++)
+            if (x >= dropdownX && x <= dropdownX + dropdownWidth && y >= dropdownY && y <= dropdownY + dropdownHeight)
             {
-                int optionX = 20 + i * (optionWidth + optionSpacing);
-                if (x >= optionX && x <= optionX + optionWidth && y >= optionY && y <= optionY + optionHeight)
+                G_DropdownOpen = !G_DropdownOpen;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+
+            // 如果下拉菜单打开，检查是否点击了选项
+            if (G_DropdownOpen)
+            {
+                int optionHeight = 40;
+                int listY = dropdownY + dropdownHeight;
+
+                for (int i = 0; i < RETENTION_COUNT; i++)
                 {
-                    G_SelectedRetentionIndex = i;
-                    G_RetentionDays = RETENTION_OPTIONS[i];
-                    G_Storage.SaveSettings (G_RetentionDays, G_MaxRecords);
-                    InvalidateRect (hWnd, NULL, TRUE);
-                    return 0;
+                    int optionY = listY + i * optionHeight;
+                    if (x >= dropdownX && x <= dropdownX + dropdownWidth && y >= optionY && y <= optionY + optionHeight)
+                    {
+                        G_SelectedRetentionIndex = i;
+                        G_RetentionDays = RETENTION_OPTIONS[i];
+                        G_Storage.SaveSettings (G_RetentionDays, G_MaxRecords);
+                        G_DropdownOpen = false;
+                        InvalidateRect (hWnd, NULL, TRUE);
+                        return 0;
+                    }
                 }
             }
 
             // 检查是否点击了版本信息入口
-            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 170 && y <= 200)
+            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 200 && y <= 240)
             {
                 G_CurrentPage = PAGE_VERSION;
+                G_DropdownOpen = false;
                 InvalidateRect (hWnd, NULL, TRUE);
                 return 0;
             }
 
             // 检查是否点击了问题反馈入口
-            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 210 && y <= 240)
+            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 260 && y <= 300)
             {
                 G_CurrentPage = PAGE_FEEDBACK;
+                G_DropdownOpen = false;
                 InvalidateRect (hWnd, NULL, TRUE);
                 return 0;
             }
 
             // 检查是否点击了 GitHub 链接
-            int githubY = G_WindowHeight - 50;
-            if (x >= 130 && x <= 130 + 400 && y >= githubY && y <= githubY + 20)
+            int githubY = G_WindowHeight - 55;
+            if (x >= 150 && x <= 150 + 500 && y >= githubY && y <= githubY + 20)
             {
                 // 打开默认浏览器
                 ShellExecuteW (NULL, L"open", APP_GITHUB_URL, NULL, NULL, SW_SHOWNORMAL);
