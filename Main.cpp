@@ -19,7 +19,7 @@ Storage G_Storage;
 
 // 版本号
 const wchar_t* APP_VERSION = L"1.1.0.0";
-const wchar_t* APP_UPDATE_DATE = L"2026-06-01";
+const wchar_t* APP_UPDATE_DATE = L"2026-06-02";
 const wchar_t* APP_AUTHOR = L"YZH2653";
 const wchar_t* APP_AUTHOR_EMAIL = L"yzh2653@163.com";
 const wchar_t* APP_GITHUB_URL = L"https://github.com/YZH2653/ClipboardHistoryManager";
@@ -363,16 +363,16 @@ void DrawSettingsPage (HDC hdc)
 
     // 保存时间设置
     SetTextColor (hdc, RGB (33, 33, 33));
-    HFONT sectionFont = CreateFont (20, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT sectionFont = CreateFont (22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, sectionFont);
     TextOut (hdc, 20, 80, L"保存时间", 4);
     DeleteObject (sectionFont);
 
-    // 绘制下拉菜单框
-    int dropdownX = 20;
-    int dropdownY = 115;
+    // 绘制下拉菜单框（在右边）
     int dropdownWidth = 200;
     int dropdownHeight = 40;
+    int dropdownX = G_WindowWidth - dropdownWidth - 40;
+    int dropdownY = 75;
 
     // 绘制下拉框背景
     COLORREF bgColor = RGB (255, 255, 255);
@@ -390,7 +390,7 @@ void DrawSettingsPage (HDC hdc)
     // 绘制当前选中的值
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT valueFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT valueFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, valueFont);
     TextOut (hdc, dropdownX + 15, dropdownY + 10, RETENTION_LABELS[G_SelectedRetentionIndex], wcslen (RETENTION_LABELS[G_SelectedRetentionIndex]));
 
@@ -399,10 +399,10 @@ void DrawSettingsPage (HDC hdc)
     TextOut (hdc, dropdownX + dropdownWidth - 25, dropdownY + 10, L"▼", 1);
     DeleteObject (valueFont);
 
-    // 如果下拉菜单打开，绘制选项列表
+    // 如果下拉菜单打开，绘制选项列表（在右边）
     if (G_DropdownOpen)
     {
-        int optionHeight = 40;
+        int optionHeight = 45;
         int listY = dropdownY + dropdownHeight;
 
         for (int i = 0; i < RETENTION_COUNT; i++)
@@ -427,7 +427,7 @@ void DrawSettingsPage (HDC hdc)
             COLORREF textColor = isSelected ? RGB (255, 255, 255) : RGB (33, 33, 33);
             SetTextColor (hdc, textColor);
             SetBkMode (hdc, TRANSPARENT);
-            HFONT optionFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+            HFONT optionFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
             SelectObject (hdc, optionFont);
 
             SIZE textSize;
@@ -440,9 +440,15 @@ void DrawSettingsPage (HDC hdc)
         }
     }
 
+    // 绘制分割线
+    SelectObject (hdc, linePen);
+    MoveToEx (hdc, 20, 140, NULL);
+    LineTo (hdc, G_WindowWidth - 20, 140);
+    DeleteObject (linePen);
+
     // 版本信息入口
-    int versionY = 200;
-    HFONT versionFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    int versionY = 170;
+    HFONT versionFont = CreateFont (22, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, versionFont);
     SetTextColor (hdc, RGB (33, 33, 33));
     TextOut (hdc, 20, versionY, L"版本信息", 4);
@@ -451,8 +457,14 @@ void DrawSettingsPage (HDC hdc)
     SetTextColor (hdc, RGB (150, 150, 150));
     TextOut (hdc, G_WindowWidth - 40, versionY, L"→", 1);
 
+    // 绘制分割线
+    SelectObject (hdc, linePen);
+    MoveToEx (hdc, 20, versionY + 40, NULL);
+    LineTo (hdc, G_WindowWidth - 20, versionY + 40);
+    DeleteObject (linePen);
+
     // 问题反馈入口
-    int feedbackY = 260;
+    int feedbackY = 230;
     SetTextColor (hdc, RGB (33, 33, 33));
     TextOut (hdc, 20, feedbackY, L"问题反馈", 4);
 
@@ -463,13 +475,13 @@ void DrawSettingsPage (HDC hdc)
 
     // 绘制分割线
     SelectObject (hdc, linePen);
-    MoveToEx (hdc, 20, feedbackY + 35, NULL);
-    LineTo (hdc, G_WindowWidth - 20, feedbackY + 35);
+    MoveToEx (hdc, 20, feedbackY + 40, NULL);
+    LineTo (hdc, G_WindowWidth - 20, feedbackY + 40);
     DeleteObject (linePen);
 
     // GitHub 仓库地址
-    int githubY = G_WindowHeight - 55;
-    HFONT githubFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    int githubY = G_WindowHeight - 60;
+    HFONT githubFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, githubFont);
     SetTextColor (hdc, RGB (100, 100, 100));
     SetBkMode (hdc, TRANSPARENT);
@@ -477,7 +489,7 @@ void DrawSettingsPage (HDC hdc)
 
     // 绘制可点击的链接
     SetTextColor (hdc, RGB (100, 149, 237));
-    TextOut (hdc, 150, githubY, APP_GITHUB_URL, wcslen (APP_GITHUB_URL));
+    TextOut (hdc, 180, githubY, APP_GITHUB_URL, wcslen (APP_GITHUB_URL));
     DeleteObject (githubFont);
 }
 
@@ -965,11 +977,11 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 return 0;
             }
 
-            // 检查是否点击了下拉菜单框
-            int dropdownX = 20;
-            int dropdownY = 115;
+            // 检查是否点击了下拉菜单框（在右边）
             int dropdownWidth = 200;
             int dropdownHeight = 40;
+            int dropdownX = G_WindowWidth - dropdownWidth - 40;
+            int dropdownY = 75;
 
             if (x >= dropdownX && x <= dropdownX + dropdownWidth && y >= dropdownY && y <= dropdownY + dropdownHeight)
             {
@@ -981,7 +993,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             // 如果下拉菜单打开，检查是否点击了选项
             if (G_DropdownOpen)
             {
-                int optionHeight = 40;
+                int optionHeight = 45;
                 int listY = dropdownY + dropdownHeight;
 
                 for (int i = 0; i < RETENTION_COUNT; i++)
@@ -1000,7 +1012,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
 
             // 检查是否点击了版本信息入口
-            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 200 && y <= 240)
+            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 170 && y <= 210)
             {
                 G_CurrentPage = PAGE_VERSION;
                 G_DropdownOpen = false;
@@ -1009,7 +1021,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
 
             // 检查是否点击了问题反馈入口
-            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 260 && y <= 300)
+            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 230 && y <= 270)
             {
                 G_CurrentPage = PAGE_FEEDBACK;
                 G_DropdownOpen = false;
@@ -1018,8 +1030,8 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
 
             // 检查是否点击了 GitHub 链接
-            int githubY = G_WindowHeight - 55;
-            if (x >= 150 && x <= 150 + 500 && y >= githubY && y <= githubY + 20)
+            int githubY = G_WindowHeight - 60;
+            if (x >= 180 && x <= 180 + 500 && y >= githubY && y <= githubY + 25)
             {
                 // 打开默认浏览器
                 ShellExecuteW (NULL, L"open", APP_GITHUB_URL, NULL, NULL, SW_SHOWNORMAL);
