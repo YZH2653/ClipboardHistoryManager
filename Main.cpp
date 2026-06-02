@@ -202,7 +202,7 @@ void DrawSearchBox (HDC hdc, int x, int y, int width)
     // 绘制背景
     COLORREF bgColor = G_SearchFocused ? RGB (255, 255, 255) : RGB (245, 245, 245);
     HBRUSH bgBrush = CreateSolidBrush (bgColor);
-    RECT bgRect = { x, y, x + width, y + 40 };
+    RECT bgRect = { x, y, x + width, y + 50 };
     FillRect (hdc, &bgRect, bgBrush);
     DeleteObject (bgBrush);
 
@@ -210,30 +210,30 @@ void DrawSearchBox (HDC hdc, int x, int y, int width)
     COLORREF borderColor = G_SearchFocused ? RGB (100, 149, 237) : RGB (200, 200, 200);
     HPEN borderPen = CreatePen (PS_SOLID, 2, borderColor);
     SelectObject (hdc, borderPen);
-    Rectangle (hdc, x, y, x + width, y + 40);
+    Rectangle (hdc, x, y, x + width, y + 50);
     DeleteObject (borderPen);
 
     // 绘制搜索图标
     SetTextColor (hdc, RGB (150, 150, 150));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT iconFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Segoe UI Emoji");
+    HFONT iconFont = CreateFont (22, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Segoe UI Emoji");
     SelectObject (hdc, iconFont);
-    TextOut (hdc, x + 12, y + 10, L"🔍", 1);
+    TextOut (hdc, x + 15, y + 12, L"🔍", 1);
     DeleteObject (iconFont);
 
     // 绘制输入文本
-    HFONT inputFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT inputFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, inputFont);
 
     if (G_SearchText.empty () && !G_SearchFocused)
     {
         SetTextColor (hdc, RGB (180, 180, 180));
-        TextOut (hdc, x + 40, y + 12, L"搜索历史记录...", 7);
+        TextOut (hdc, x + 50, y + 14, L"搜索历史记录...", 7);
     }
     else
     {
         SetTextColor (hdc, RGB (33, 33, 33));
-        TextOut (hdc, x + 40, y + 12, G_SearchText.c_str (), G_SearchText.length ());
+        TextOut (hdc, x + 50, y + 14, G_SearchText.c_str (), G_SearchText.length ());
     }
 
     DeleteObject (inputFont);
@@ -245,7 +245,7 @@ void DrawSearchBox (HDC hdc, int x, int y, int width)
         SIZE textSize = { 0, 0 };
         if (!G_SearchText.empty ())
         {
-            HFONT tempFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+            HFONT tempFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
             SelectObject (hdc, tempFont);
             GetTextExtentPoint32 (hdc, G_SearchText.c_str (), G_SearchText.length (), &textSize);
             DeleteObject (tempFont);
@@ -254,8 +254,8 @@ void DrawSearchBox (HDC hdc, int x, int y, int width)
         // 绘制光标竖线
         HPEN cursorPen = CreatePen (PS_SOLID, 2, RGB (33, 33, 33));
         SelectObject (hdc, cursorPen);
-        MoveToEx (hdc, x + 40 + textSize.cx + 2, y + 8, NULL);
-        LineTo (hdc, x + 40 + textSize.cx + 2, y + 32);
+        MoveToEx (hdc, x + 50 + textSize.cx + 2, y + 10, NULL);
+        LineTo (hdc, x + 50 + textSize.cx + 2, y + 40);
         DeleteObject (cursorPen);
     }
 }
@@ -279,7 +279,7 @@ void DrawButton (HDC hdc, int x, int y, int width, int height, const wstring& te
     // 绘制文字
     SetTextColor (hdc, RGB (80, 80, 80));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT btnFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT btnFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, btnFont);
 
     SIZE textSize;
@@ -334,7 +334,7 @@ void DrawBackButton (HDC hdc, int x, int y, bool isHovered)
     // 绘制文字
     SetTextColor (hdc, RGB (80, 80, 80));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT btnFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT btnFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, btnFont);
     TextOut (hdc, x + 12, y + 7, L"← 返回", 5);
     DeleteObject (btnFont);
@@ -349,7 +349,7 @@ void DrawSettingsPage (HDC hdc)
     // 绘制标题
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT titleFont = CreateFont (28, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT titleFont = CreateFont (36, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, titleFont);
     TextOut (hdc, 100, 12, L"设置", 2);
     DeleteObject (titleFont);
@@ -363,7 +363,7 @@ void DrawSettingsPage (HDC hdc)
 
     // 保存时间设置
     SetTextColor (hdc, RGB (33, 33, 33));
-    HFONT sectionFont = CreateFont (22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT sectionFont = CreateFont (26, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, sectionFont);
     TextOut (hdc, 20, 80, L"保存时间", 4);
     DeleteObject (sectionFont);
@@ -390,7 +390,7 @@ void DrawSettingsPage (HDC hdc)
     // 绘制当前选中的值
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT valueFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT valueFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, valueFont);
     TextOut (hdc, dropdownX + 15, dropdownY + 10, RETENTION_LABELS[G_SelectedRetentionIndex], wcslen (RETENTION_LABELS[G_SelectedRetentionIndex]));
 
@@ -407,7 +407,7 @@ void DrawSettingsPage (HDC hdc)
 
     // 版本信息入口
     int versionY = 170;
-    HFONT versionFont = CreateFont (22, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT versionFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, versionFont);
     SetTextColor (hdc, RGB (33, 33, 33));
     TextOut (hdc, 20, versionY, L"版本信息", 4);
@@ -440,7 +440,7 @@ void DrawSettingsPage (HDC hdc)
 
     // GitHub 仓库地址
     int githubY = G_WindowHeight - 60;
-    HFONT githubFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT githubFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, githubFont);
     SetTextColor (hdc, RGB (100, 100, 100));
     SetBkMode (hdc, TRANSPARENT);
@@ -448,7 +448,7 @@ void DrawSettingsPage (HDC hdc)
 
     // 绘制可点击的链接
     SetTextColor (hdc, RGB (100, 149, 237));
-    TextOut (hdc, 180, githubY, APP_GITHUB_URL, wcslen (APP_GITHUB_URL));
+    TextOut (hdc, 200, githubY, APP_GITHUB_URL, wcslen (APP_GITHUB_URL));
     DeleteObject (githubFont);
 
     // 最后绘制下拉菜单选项列表（确保在最上层）
@@ -479,7 +479,7 @@ void DrawSettingsPage (HDC hdc)
             COLORREF textColor = isSelected ? RGB (100, 149, 237) : RGB (33, 33, 33);
             SetTextColor (hdc, textColor);
             SetBkMode (hdc, TRANSPARENT);
-            HFONT optionFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+            HFONT optionFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
             SelectObject (hdc, optionFont);
 
             SIZE textSize;
@@ -508,7 +508,7 @@ void DrawVersionPage (HDC hdc)
     // 绘制标题
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT titleFont = CreateFont (28, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT titleFont = CreateFont (36, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, titleFont);
     TextOut (hdc, 100, 12, L"版本信息", 4);
     DeleteObject (titleFont);
@@ -522,9 +522,9 @@ void DrawVersionPage (HDC hdc)
 
     // 版本信息内容
     int contentY = 80;
-    int lineHeight = 45;
+    int lineHeight = 50;
 
-    HFONT contentFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT contentFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, contentFont);
 
     // 版本号
@@ -573,7 +573,7 @@ void DrawFeedbackPage (HDC hdc)
     // 绘制标题
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT titleFont = CreateFont (28, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT titleFont = CreateFont (36, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, titleFont);
     TextOut (hdc, 100, 12, L"问题反馈", 4);
     DeleteObject (titleFont);
@@ -587,35 +587,35 @@ void DrawFeedbackPage (HDC hdc)
 
     // 问题反馈内容
     int contentY = 80;
-    int lineHeight = 40;
+    int lineHeight = 45;
 
-    HFONT contentFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT contentFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, contentFont);
 
     // 作者邮箱
     SetTextColor (hdc, RGB (100, 100, 100));
     TextOut (hdc, 20, contentY, L"作者邮箱", 4);
     SetTextColor (hdc, RGB (33, 33, 33));
-    TextOut (hdc, 120, contentY, APP_AUTHOR_EMAIL, wcslen (APP_AUTHOR_EMAIL));
-    contentY += lineHeight + 20;
+    TextOut (hdc, 130, contentY, APP_AUTHOR_EMAIL, wcslen (APP_AUTHOR_EMAIL));
+    contentY += lineHeight + 25;
 
     // 反馈格式说明
     SetTextColor (hdc, RGB (33, 33, 33));
-    HFONT hintFont = CreateFont (22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT hintFont = CreateFont (28, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, hintFont);
     TextOut (hdc, 20, contentY, L"请按以下格式写:", 8);
     DeleteObject (hintFont);
     contentY += lineHeight;
 
     // 反馈格式内容
-    HFONT formatFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT formatFont = CreateFont (22, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, formatFont);
 
     SetTextColor (hdc, RGB (80, 80, 80));
     TextOut (hdc, 40, contentY, L"软件版本(可在版本号中查看):", 15);
-    contentY += 30;
+    contentY += 35;
     TextOut (hdc, 40, contentY, L"出现问题的时间:", 8);
-    contentY += 30;
+    contentY += 35;
     TextOut (hdc, 40, contentY, L"描述问题(可用图片表示):", 12);
 
     DeleteObject (formatFont);
@@ -650,7 +650,7 @@ void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool 
     int contentX = x + 15;
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT contentFont = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT contentFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, contentFont);
 
     wstring preview = record.preview;
@@ -668,7 +668,7 @@ void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool 
     wchar_t timeStr[32];
     wcsftime (timeStr, 32, L"%Y-%m-%d %H:%M", &timeInfo);
     SetTextColor (hdc, RGB (150, 150, 150));
-    HFONT timeFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT timeFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, timeFont);
     TextOut (hdc, contentX, y + 65, timeStr, wcslen (timeStr));
     DeleteObject (timeFont);
@@ -760,7 +760,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             // 绘制标题
             SetTextColor (hdc, RGB (33, 33, 33));
             SetBkMode (hdc, TRANSPARENT);
-            HFONT titleFont = CreateFont (24, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+            HFONT titleFont = CreateFont (32, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
             SelectObject (hdc, titleFont);
             TextOut (hdc, 20, 12, L"历史剪贴板管理器", 8);
             DeleteObject (titleFont);
@@ -808,11 +808,11 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             // 如果没有记录，显示提示
             if (records.empty ())
             {
-                HFONT hintFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+                HFONT hintFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
                 SelectObject (hdc, hintFont);
                 SetTextColor (hdc, RGB (150, 150, 150));
                 wstring hintText = G_SearchText.empty () ? L"暂无历史记录，请复制内容测试" : L"未找到匹配的记录";
-                TextOut (hdc, G_WindowWidth / 2 - 120, G_WindowHeight / 2, hintText.c_str (), hintText.length ());
+                TextOut (hdc, G_WindowWidth / 2 - 150, G_WindowHeight / 2, hintText.c_str (), hintText.length ());
                 DeleteObject (hintFont);
             }
         }
