@@ -548,12 +548,12 @@ void DrawVersionPage (HDC hdc)
 
     // 更新内容列表
     SetTextColor (hdc, RGB (33, 33, 33));
-    TextOut (hdc, 40, contentY, L"• 新增设置页面", 7);
-    contentY += 30;
-    TextOut (hdc, 40, contentY, L"• 支持保存时间配置", 9);
-    contentY += 30;
-    TextOut (hdc, 40, contentY, L"• 显示版本信息", 7);
-    contentY += lineHeight + 15;
+    TextOut (hdc, 40, contentY, L"• 新增设置页面", 8);
+    contentY += 35;
+    TextOut (hdc, 40, contentY, L"• 支持保存时间配置", 10);
+    contentY += 35;
+    TextOut (hdc, 40, contentY, L"• 显示版本信息", 8);
+    contentY += lineHeight + 20;
 
     // 作者
     SetTextColor (hdc, RGB (100, 100, 100));
