@@ -22,6 +22,7 @@ const wchar_t* APP_VERSION = L"1.1.0.0";
 const wchar_t* APP_UPDATE_DATE = L"2026-06-01";
 const wchar_t* APP_AUTHOR = L"YZH2653";
 const wchar_t* APP_AUTHOR_EMAIL = L"yzh2653@163.com";
+const wchar_t* APP_GITHUB_URL = L"https://github.com/YZH2653/ClipboardHistoryManager";
 
 // 页面状态
 enum PageState
@@ -433,6 +434,19 @@ void DrawSettingsPage (HDC hdc)
     MoveToEx (hdc, 20, feedbackY + 30, NULL);
     LineTo (hdc, G_WindowWidth - 20, feedbackY + 30);
     DeleteObject (linePen);
+
+    // GitHub 仓库地址
+    int githubY = G_WindowHeight - 50;
+    HFONT githubFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, githubFont);
+    SetTextColor (hdc, RGB (100, 100, 100));
+    SetBkMode (hdc, TRANSPARENT);
+    TextOut (hdc, 20, githubY, L"GitHub仓库地址:", 8);
+
+    // 绘制可点击的链接
+    SetTextColor (hdc, RGB (100, 149, 237));
+    TextOut (hdc, 130, githubY, APP_GITHUB_URL, wcslen (APP_GITHUB_URL));
+    DeleteObject (githubFont);
 }
 
 // 绘制版本号页面
@@ -950,6 +964,15 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 G_CurrentPage = PAGE_FEEDBACK;
                 InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+
+            // 检查是否点击了 GitHub 链接
+            int githubY = G_WindowHeight - 50;
+            if (x >= 130 && x <= 130 + 400 && y >= githubY && y <= githubY + 20)
+            {
+                // 打开默认浏览器
+                ShellExecuteW (NULL, L"open", APP_GITHUB_URL, NULL, NULL, SW_SHOWNORMAL);
                 return 0;
             }
         }
