@@ -11,7 +11,7 @@
 
 ## 项目结构
 ```
-Project1/
+Clipboard History Manager/
 ├── Main.cpp                 # 入口点，窗口创建和消息循环
 ├── ClipboardManager.h/cpp   # 剪贴板监听和内容捕获
 ├── Storage.h/cpp            # 文件存储和管理
@@ -24,8 +24,16 @@ Project1/
 │   ├── requirements.md      # 需求文档
 │   ├── technical-design.md  # 技术设计规范
 │   └── execution-steps.md   # 执行步骤
-├── devlogs/                 # 开发日志
+├── devlogs/                 # 软件开发日志
 │   └── YYYY-MM-DD-*.md      # 按日期记录的开发日志
+├── versions/                # 版本开发目录
+│   ├── README.md            # 版本开发指引
+│   └── X.X.X.X/             # 各版本开发文件夹
+│       ├── README.md        # 版本概述
+│       ├── changelog.md     # 版本更新日志
+│       ├── requirements.md  # 本版本需求
+│       ├── execution-steps.md # 执行步骤
+│       └── devlogs/         # 版本开发日志
 └── output/                  # 编译输出
     └── ClipboardHistory.exe # 可执行文件
 ```
@@ -57,18 +65,26 @@ g++ -std=c++17 -o output/ClipboardHistory.exe *.cpp -luser32 -lkernel32 -lgdi32
 
 ## 开发流程
 
-### 阶段划分
+### 阶段划分（软件初始开发）
 1. **基础框架**：窗口创建和编译配置 ✅
-2. **剪贴板监听**：文字和图片捕获
-3. **存储系统**：JSON读写和文件管理
-4. **界面交互**：列表、搜索、置顶、删除
-5. **测试优化**：功能测试和打包
+2. **剪贴板监听**：文字和图片捕获 ✅
+3. **存储系统**：JSON读写和文件管理 ✅
+4. **界面交互**：列表、搜索、置顶、删除 ✅
+5. **测试优化**：功能测试和打包 ✅
+
+### 版本更新流程（v1.1.0.0起）
+1. **创建分支**：从 main 创建版本分支 `git checkout -b X.X.X.X`
+2. **编写文档**：在 `versions/X.X.X.X/` 下创建需求、执行步骤等文档
+3. **逐步开发**：按执行步骤逐步实现，每完成一步提交一次
+4. **测试验证**：功能开发完成后进行全面测试
+5. **合并主干**：测试无误后合并到 main 分支
 
 ### 工作要求
-- 每完成一个阶段，更新devlogs中的开发日志
+- 每完成一个阶段，更新版本开发日志（versions/X.X.X.X/devlogs/）
 - 每完成一个阶段，提交到Git仓库
-- 按照docs/execution-steps.md中的步骤执行
-- 遇到问题及时记录到开发日志
+- 按照 versions/X.X.X.X/execution-steps.md 中的步骤执行
+- 遇到问题及时记录到版本开发日志
+- 软件初始开发日志和版本更新日志分开存放
 
 ## 依赖库
 
@@ -99,8 +115,18 @@ curl -L https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp -o j
 - 内存占用：< 50MB
 
 ## 重要文件路径
+
+### 软件初始开发文档
 - 需求文档：docs/requirements.md
 - 技术设计：docs/technical-design.md
 - 执行步骤：docs/execution-steps.md
 - 开发日志：devlogs/YYYY-MM-DD-*.md
 - 编译配置：.vscode/c_cpp_properties.json
+
+### 版本更新文档（以 X.X.X.X 为版本号）
+- 版本开发指引：versions/README.md
+- 版本概述：versions/X.X.X.X/README.md
+- 版本需求：versions/X.X.X.X/requirements.md
+- 版本执行步骤：versions/X.X.X.X/execution-steps.md
+- 版本更新日志：versions/X.X.X.X/changelog.md
+- 版本开发日志：versions/X.X.X.X/devlogs/YYYY-MM-DD.md
