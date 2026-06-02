@@ -17,6 +17,19 @@ const wchar_t* CLASS_NAME = L"ClipboardHistoryClass";
 ClipboardManager G_ClipManager;
 Storage G_Storage;
 
+// 版本号
+const wchar_t* APP_VERSION = L"1.1.0.0";
+const wchar_t* APP_UPDATE_DATE = L"2026-06-01";
+const wchar_t* APP_AUTHOR = L"YZH2653";
+
+// 页面状态
+enum PageState
+{
+    PAGE_MAIN,
+    PAGE_SETTINGS
+};
+PageState G_CurrentPage = PAGE_MAIN;
+
 // 设置参数
 int G_RetentionDays = 3;    // 保留天数
 int G_MaxRecords = 1000;    // 最大记录数
@@ -267,6 +280,27 @@ void DrawButton (HDC hdc, int x, int y, int width, int height, const wstring& te
     DeleteObject (btnFont);
 }
 
+// 绘制设置按钮（齿轮图标）
+void DrawSettingsButton (HDC hdc, int x, int y, bool isHovered)
+{
+    int size = 32;
+
+    // 绘制背景
+    COLORREF bgColor = isHovered ? RGB (220, 220, 220) : RGB (240, 240, 240);
+    HBRUSH bgBrush = CreateSolidBrush (bgColor);
+    RECT bgRect = { x, y, x + size, y + size };
+    FillRect (hdc, &bgRect, bgBrush);
+    DeleteObject (bgBrush);
+
+    // 绘制齿轮图标
+    SetTextColor (hdc, RGB (100, 100, 100));
+    SetBkMode (hdc, TRANSPARENT);
+    HFONT iconFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Segoe UI Emoji");
+    SelectObject (hdc, iconFont);
+    TextOut (hdc, x + 6, y + 4, L"⚙", 1);
+    DeleteObject (iconFont);
+}
+
 // 绘制卡片
 void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool isHovered)
 {
@@ -394,65 +428,72 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         // 绘制背景
         FillRect (hdc, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW + 1));
 
-        // 计算布局
-        int contentWidth = G_WindowWidth - 40;
-        int searchWidth = contentWidth;
-        int cardWidth = contentWidth;
-
-        // 绘制标题
-        SetTextColor (hdc, RGB (33, 33, 33));
-        SetBkMode (hdc, TRANSPARENT);
-        HFONT titleFont = CreateFont (24, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
-        SelectObject (hdc, titleFont);
-        TextOut (hdc, 20, 12, L"历史剪贴板管理器", 8);
-        DeleteObject (titleFont);
-
-        // 绘制搜索框
-        DrawSearchBox (hdc, 20, 50, searchWidth);
-
-        // 绘制分割线
-        HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
-        SelectObject (hdc, linePen);
-        MoveToEx (hdc, 20, 100, NULL);
-        LineTo (hdc, 20 + searchWidth, 100);
-        DeleteObject (linePen);
-
-        // 绘制历史记录列表
-        vector<ClipRecord> records = GetFilteredRecords ();
-        int cardY = 110 - G_ScrollOffset;
-        int cardHeight = 100;
-        int cardMargin = 10;
-
-        for (int i = 0; i < (int)records.size (); i++)
+        if (G_CurrentPage == PAGE_MAIN)
         {
-            // 检查是否超出可视区域
-            if (cardY + cardHeight > G_WindowHeight - 20)
-            {
-                break;
-            }
+            // 主页面
+            // 计算布局
+            int contentWidth = G_WindowWidth - 40;
+            int searchWidth = contentWidth;
+            int cardWidth = contentWidth;
 
-            // 跳过在可视区域上方的卡片
-            if (cardY + cardHeight < 0)
+            // 绘制标题
+            SetTextColor (hdc, RGB (33, 33, 33));
+            SetBkMode (hdc, TRANSPARENT);
+            HFONT titleFont = CreateFont (24, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+            SelectObject (hdc, titleFont);
+            TextOut (hdc, 20, 12, L"历史剪贴板管理器", 8);
+            DeleteObject (titleFont);
+
+            // 绘制设置按钮
+            DrawSettingsButton (hdc, G_WindowWidth - 52, 10, false);
+
+            // 绘制搜索框
+            DrawSearchBox (hdc, 20, 50, searchWidth);
+
+            // 绘制分割线
+            HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
+            SelectObject (hdc, linePen);
+            MoveToEx (hdc, 20, 100, NULL);
+            LineTo (hdc, 20 + searchWidth, 100);
+            DeleteObject (linePen);
+
+            // 绘制历史记录列表
+            vector<ClipRecord> records = GetFilteredRecords ();
+            int cardY = 110 - G_ScrollOffset;
+            int cardHeight = 100;
+            int cardMargin = 10;
+
+            for (int i = 0; i < (int)records.size (); i++)
             {
+                // 检查是否超出可视区域
+                if (cardY + cardHeight > G_WindowHeight - 20)
+                {
+                    break;
+                }
+
+                // 跳过在可视区域上方的卡片
+                if (cardY + cardHeight < 0)
+                {
+                    cardY += cardHeight + cardMargin;
+                    continue;
+                }
+
+                // 绘制卡片
+                bool isHovered = (i == G_HoverIndex);
+                DrawCard (hdc, 20, cardY, cardWidth, records[i], isHovered);
                 cardY += cardHeight + cardMargin;
-                continue;
             }
 
-            // 绘制卡片
-            bool isHovered = (i == G_HoverIndex);
-            DrawCard (hdc, 20, cardY, cardWidth, records[i], isHovered);
-            cardY += cardHeight + cardMargin;
-        }
-
-        // 如果没有记录，显示提示
-        if (records.empty ())
-        {
-            HFONT hintFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
-            SelectObject (hdc, hintFont);
-            SetTextColor (hdc, RGB (150, 150, 150));
-            wstring hintText = G_SearchText.empty () ? L"暂无历史记录，请复制内容测试" : L"未找到匹配的记录";
-            TextOut (hdc, G_WindowWidth / 2 - 120, G_WindowHeight / 2, hintText.c_str (), hintText.length ());
-            DeleteObject (hintFont);
+            // 如果没有记录，显示提示
+            if (records.empty ())
+            {
+                HFONT hintFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+                SelectObject (hdc, hintFont);
+                SetTextColor (hdc, RGB (150, 150, 150));
+                wstring hintText = G_SearchText.empty () ? L"暂无历史记录，请复制内容测试" : L"未找到匹配的记录";
+                TextOut (hdc, G_WindowWidth / 2 - 120, G_WindowHeight / 2, hintText.c_str (), hintText.length ());
+                DeleteObject (hintFont);
+            }
         }
 
         EndPaint (hWnd, &ps);
@@ -495,20 +536,32 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         int x = LOWORD (lParam);
         int y = HIWORD (lParam);
 
-        // 检查是否点击了搜索框
-        if (y >= 50 && y < 90 && x >= 20 && x <= G_WindowWidth - 20)
+        if (G_CurrentPage == PAGE_MAIN)
         {
-            G_SearchFocused = true;
-            SetFocus (hWnd);
-            InvalidateRect (hWnd, NULL, TRUE);
-            return 0;
-        }
+            // 主页面点击处理
 
-        // 检查是否点击了卡片
-        int cardY = 110 - G_ScrollOffset;
-        int cardHeight = 100;
-        int cardMargin = 10;
-        vector<ClipRecord> records = GetFilteredRecords ();
+            // 检查是否点击了设置按钮
+            if (x >= G_WindowWidth - 52 && x <= G_WindowWidth - 20 && y >= 10 && y <= 42)
+            {
+                G_CurrentPage = PAGE_SETTINGS;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+
+            // 检查是否点击了搜索框
+            if (y >= 50 && y < 90 && x >= 20 && x <= G_WindowWidth - 20)
+            {
+                G_SearchFocused = true;
+                SetFocus (hWnd);
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+
+            // 检查是否点击了卡片
+            int cardY = 110 - G_ScrollOffset;
+            int cardHeight = 100;
+            int cardMargin = 10;
+            vector<ClipRecord> records = GetFilteredRecords ();
 
         for (int i = 0; i < (int)records.size (); i++)
         {
@@ -580,6 +633,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         // 点击其他地方，取消搜索框焦点
         G_SearchFocused = false;
+        }
 
         return 0;
     }
