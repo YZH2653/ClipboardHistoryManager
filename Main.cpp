@@ -34,6 +34,12 @@ PageState G_CurrentPage = PAGE_MAIN;
 int G_RetentionDays = 3;    // 保留天数
 int G_MaxRecords = 1000;    // 最大记录数
 
+// 保存时间选项
+const int RETENTION_OPTIONS[] = {3, 5, 7, 30, -1};  // -1 表示永久
+const wchar_t* RETENTION_LABELS[] = {L"3天", L"5天", L"7天", L"30天", L"永久"};
+const int RETENTION_COUNT = 5;
+int G_SelectedRetentionIndex = 0;  // 当前选中的保存时间索引
+
 // 界面状态
 wstring G_SearchText;       // 搜索文本
 int G_ScrollOffset = 0;     // 滚动偏移量
@@ -301,6 +307,104 @@ void DrawSettingsButton (HDC hdc, int x, int y, bool isHovered)
     DeleteObject (iconFont);
 }
 
+// 绘制返回按钮
+void DrawBackButton (HDC hdc, int x, int y, bool isHovered)
+{
+    int width = 60;
+    int height = 30;
+
+    // 绘制背景
+    COLORREF bgColor = isHovered ? RGB (200, 200, 200) : RGB (230, 230, 230);
+    HBRUSH bgBrush = CreateSolidBrush (bgColor);
+    RECT bgRect = { x, y, x + width, y + height };
+    FillRect (hdc, &bgRect, bgBrush);
+    DeleteObject (bgBrush);
+
+    // 绘制边框
+    HPEN borderPen = CreatePen (PS_SOLID, 1, RGB (180, 180, 180));
+    SelectObject (hdc, borderPen);
+    Rectangle (hdc, x, y, x + width, y + height);
+    DeleteObject (borderPen);
+
+    // 绘制文字
+    SetTextColor (hdc, RGB (80, 80, 80));
+    SetBkMode (hdc, TRANSPARENT);
+    HFONT btnFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, btnFont);
+    TextOut (hdc, x + 12, y + 7, L"← 返回", 5);
+    DeleteObject (btnFont);
+}
+
+// 绘制设置页面
+void DrawSettingsPage (HDC hdc)
+{
+    // 绘制返回按钮
+    DrawBackButton (hdc, 20, 10, false);
+
+    // 绘制标题
+    SetTextColor (hdc, RGB (33, 33, 33));
+    SetBkMode (hdc, TRANSPARENT);
+    HFONT titleFont = CreateFont (24, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, titleFont);
+    TextOut (hdc, 100, 12, L"设置", 2);
+    DeleteObject (titleFont);
+
+    // 绘制分割线
+    HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
+    SelectObject (hdc, linePen);
+    MoveToEx (hdc, 20, 50, NULL);
+    LineTo (hdc, G_WindowWidth - 20, 50);
+    DeleteObject (linePen);
+
+    // 保存时间设置
+    SetTextColor (hdc, RGB (33, 33, 33));
+    HFONT sectionFont = CreateFont (18, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, sectionFont);
+    TextOut (hdc, 20, 70, L"保存时间", 4);
+    DeleteObject (sectionFont);
+
+    // 绘制选项卡
+    int optionWidth = 70;
+    int optionHeight = 35;
+    int optionY = 105;
+    int optionSpacing = 10;
+
+    for (int i = 0; i < RETENTION_COUNT; i++)
+    {
+        int optionX = 20 + i * (optionWidth + optionSpacing);
+        bool isSelected = (i == G_SelectedRetentionIndex);
+
+        // 绘制选项背景
+        COLORREF bgColor = isSelected ? RGB (100, 149, 237) : RGB (245, 245, 245);
+        HBRUSH bgBrush = CreateSolidBrush (bgColor);
+        RECT bgRect = { optionX, optionY, optionX + optionWidth, optionY + optionHeight };
+        FillRect (hdc, &bgRect, bgBrush);
+        DeleteObject (bgBrush);
+
+        // 绘制边框
+        COLORREF borderColor = isSelected ? RGB (70, 119, 197) : RGB (200, 200, 200);
+        HPEN borderPen = CreatePen (PS_SOLID, 1, borderColor);
+        SelectObject (hdc, borderPen);
+        Rectangle (hdc, optionX, optionY, optionX + optionWidth, optionY + optionHeight);
+        DeleteObject (borderPen);
+
+        // 绘制文字
+        COLORREF textColor = isSelected ? RGB (255, 255, 255) : RGB (80, 80, 80);
+        SetTextColor (hdc, textColor);
+        SetBkMode (hdc, TRANSPARENT);
+        HFONT optionFont = CreateFont (14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+        SelectObject (hdc, optionFont);
+
+        SIZE textSize;
+        GetTextExtentPoint32 (hdc, RETENTION_LABELS[i], wcslen (RETENTION_LABELS[i]), &textSize);
+        int textX = optionX + (optionWidth - textSize.cx) / 2;
+        int textY = optionY + (optionHeight - textSize.cy) / 2;
+        TextOut (hdc, textX, textY, RETENTION_LABELS[i], wcslen (RETENTION_LABELS[i]));
+
+        DeleteObject (optionFont);
+    }
+}
+
 // 绘制卡片
 void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool isHovered)
 {
@@ -495,6 +599,11 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 DeleteObject (hintFont);
             }
         }
+        else if (G_CurrentPage == PAGE_SETTINGS)
+        {
+            // 设置页面
+            DrawSettingsPage (hdc);
+        }
 
         EndPaint (hWnd, &ps);
         return 0;
@@ -634,6 +743,37 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         // 点击其他地方，取消搜索框焦点
         G_SearchFocused = false;
         }
+        else if (G_CurrentPage == PAGE_SETTINGS)
+        {
+            // 设置页面点击处理
+
+            // 检查是否点击了返回按钮
+            if (x >= 20 && x <= 80 && y >= 8 && y <= 38)
+            {
+                G_CurrentPage = PAGE_MAIN;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+
+            // 检查是否点击了保存时间选项
+            int optionWidth = 70;
+            int optionHeight = 35;
+            int optionY = 105;
+            int optionSpacing = 10;
+
+            for (int i = 0; i < RETENTION_COUNT; i++)
+            {
+                int optionX = 20 + i * (optionWidth + optionSpacing);
+                if (x >= optionX && x <= optionX + optionWidth && y >= optionY && y <= optionY + optionHeight)
+                {
+                    G_SelectedRetentionIndex = i;
+                    G_RetentionDays = RETENTION_OPTIONS[i];
+                    G_Storage.SaveSettings (G_RetentionDays, G_MaxRecords);
+                    InvalidateRect (hWnd, NULL, TRUE);
+                    return 0;
+                }
+            }
+        }
 
         return 0;
     }
@@ -750,6 +890,17 @@ int main ()
     // 加载设置
     G_Storage.LoadSettings (G_RetentionDays, G_MaxRecords);
     G_ClipManager.SetMaxRecords (G_MaxRecords);
+
+    // 根据加载的设置更新选中的保存时间索引
+    for (int i = 0; i < RETENTION_COUNT; i++)
+    {
+        if (RETENTION_OPTIONS[i] == G_RetentionDays)
+        {
+            G_SelectedRetentionIndex = i;
+            break;
+        }
+    }
+
     wcout << L"保留天数: " << G_RetentionDays << endl;
     wcout << L"最大记录数: " << G_MaxRecords << endl;
 
