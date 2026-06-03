@@ -90,4 +90,6 @@ private:
     int m_nextId;             // 下一个ID
     int m_maxRecords;         // 最大记录数
     ULONG_PTR m_gdiplusToken; // GDI+令牌
+    wstring m_lastContent;    // 上次捕获的内容（防止重复）
+    wstring m_lastImagePath;  // 上次捕获的图片路径（防止重复）
 };

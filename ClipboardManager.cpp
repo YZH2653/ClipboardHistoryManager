@@ -253,6 +253,13 @@ bool ClipboardManager::CaptureText ()
     // 关闭剪贴板
     CloseClipboard ();
 
+    // 检查是否与上次捕获的内容相同（防止重复）
+    if (content == m_lastContent)
+    {
+        return false;
+    }
+    m_lastContent = content;
+
     // 校验内容合法性
     if (!IsValidContent (content))
     {
@@ -354,6 +361,20 @@ bool ClipboardManager::CaptureImage ()
     // 保存图片
     pBitmap->Save (filePath.c_str (), &pngClsid, NULL);
 
+    // 清理资源
+    delete pBitmap;
+    GlobalUnlock (hData);
+    CloseClipboard ();
+
+    // 检查是否与上次捕获的图片相同（防止重复）
+    if (filePath == m_lastImagePath)
+    {
+        // 删除重复的图片文件
+        DeleteFile (filePath.c_str ());
+        return false;
+    }
+    m_lastImagePath = filePath;
+
     // 创建记录
     ClipRecord record;
     record.id = id;
@@ -363,11 +384,6 @@ bool ClipboardManager::CaptureImage ()
     record.filePath = filePath;
     record.timestamp = time (NULL);
     record.isPinned = false;
-
-    // 清理资源
-    delete pBitmap;
-    GlobalUnlock (hData);
-    CloseClipboard ();
 
     // 添加记录
     AddRecord (record);

@@ -1182,9 +1182,6 @@ int main ()
     G_Storage.SetRootDir (exeDir);
     G_Storage.Initialize ();
 
-    // 设置剪贴板管理器的根目录
-    G_ClipManager.SetRootDir (exeDir);
-
     // 加载历史记录
     vector<ClipRecord> records;
     G_Storage.LoadRecords (records);
