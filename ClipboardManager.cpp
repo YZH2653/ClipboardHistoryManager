@@ -86,7 +86,7 @@ static string GetFormatName (UINT format)
 
 // 构造函数
 ClipboardManager::ClipboardManager ()
-    : m_hWnd (NULL), m_nextId (1), m_maxRecords (1000), m_gdiplusToken (0), m_lastClipboardSeq (0)
+    : m_hWnd (NULL), m_nextId (1), m_maxRecords (1000), m_gdiplusToken (0), m_lastImageTime (0)
 {
 }
 
@@ -302,28 +302,13 @@ bool ClipboardManager::OnClipboardUpdate ()
         CloseClipboard ();
     }
 
-    // 实验性修复：先移除监听器，处理完再重新添加
-    RemoveClipboardFormatListener (m_hWnd);
-
     bool result = false;
     string skipReason = "";
 
     // 如果同时存在图片和文字，优先捕获图片（截图工具会同时写入多种格式）
     if (IsClipboardFormatAvailable (CF_DIB))
     {
-        // 检查是否与上次内容相同
-        if (currentSeq == m_lastClipboardSeq)
-        {
-            skipReason = "序列号相同，跳过保存";
-        }
-        else
-        {
-            result = CaptureImage ();
-            if (result)
-            {
-                m_lastClipboardSeq = currentSeq;
-            }
-        }
+        result = CaptureImage ();
     }
     // 只有在没有图片时才捕获文字
     else if (IsClipboardFormatAvailable (CF_UNICODETEXT))
@@ -351,9 +336,7 @@ bool ClipboardManager::OnClipboardUpdate ()
         }
     }
     DebugLog (resultLog.str ());
-
-    // 重新添加监听器
-    AddClipboardFormatListener (m_hWnd);
+    DebugLog ("---");
 
     return result;
 }
@@ -476,14 +459,48 @@ bool ClipboardManager::CaptureImage ()
     BITMAPINFO* pBmi = (BITMAPINFO*)pData;
 
     // 输出图片信息
+    int imgWidth = pBmi->bmiHeader.biWidth;
+    int imgHeight = pBmi->bmiHeader.biHeight;
     ostringstream imgInfo;
     imgInfo << "[" << timestamp << "] CaptureImage: 图片尺寸="
-            << pBmi->bmiHeader.biWidth << "x" << pBmi->bmiHeader.biHeight
+            << imgWidth << "x" << imgHeight
             << ", 位深=" << pBmi->bmiHeader.biBitCount;
     DebugLog (imgInfo.str ());
 
+    // 计算图片数据的简单哈希（取前1024字节做快速比较）
+    string currentHash = "";
+    {
+        // 读取DIB数据的前1024字节计算哈希
+        BYTE* pixels = (BYTE*)pData + pBmi->bmiHeader.biSize;
+        int dataSize = min (1024, (int)GlobalSize (hData));
+        unsigned int hash = 0;
+        for (int i = 0; i < dataSize; i++)
+        {
+            hash = hash * 31 + pixels[i];
+        }
+        ostringstream hashOss;
+        hashOss << hex << hash;
+        currentHash = hashOss.str ();
+    }
+    DebugLog ("[" + timestamp + "] CaptureImage: 哈希=" + currentHash + ", 上次哈希=" + m_lastImageHash);
+
+    // 检查是否与上次捕获的图片相同（哈希相同且时间间隔小于10秒）
+    time_t now = time (NULL);
+    if (!m_lastImageHash.empty () && currentHash == m_lastImageHash
+        && (now - m_lastImageTime) < 10)
+    {
+        DebugLog ("[" + timestamp + "] CaptureImage: 与上次图片内容相同且间隔<10秒，跳过");
+        GlobalUnlock (hData);
+        CloseClipboard ();
+        return false;
+    }
+
     // 使用GDI+从DIB数据创建Bitmap
     Gdiplus::Bitmap* pBitmap = Gdiplus::Bitmap::FromBITMAPINFO (pBmi, pData);
+
+    // 确保images目录存在
+    wstring imagesDir = m_rootDir + L"\\clips\\images";
+    CreateDirectoryW (imagesDir.c_str (), NULL);
 
     // 生成文件路径（绝对路径）
     int id = GenerateId ();
@@ -491,6 +508,7 @@ bool ClipboardManager::CaptureImage ()
 
     // 保存为PNG
     CLSID pngClsid;
+    bool foundPngEncoder = false;
     // 获取PNG编码器CLSID
     UINT num = 0;
     UINT size = 0;
@@ -512,24 +530,37 @@ bool ClipboardManager::CaptureImage ()
         if (wcscmp (pImageCodecInfo[i].MimeType, L"image/png") == 0)
         {
             pngClsid = pImageCodecInfo[i].Clsid;
+            foundPngEncoder = true;
             break;
         }
     }
     free (pImageCodecInfo);
 
+    if (!foundPngEncoder)
+    {
+        DebugLog ("[" + timestamp + "] CaptureImage: 未找到PNG编码器");
+        delete pBitmap;
+        GlobalUnlock (hData);
+        CloseClipboard ();
+        return false;
+    }
+
     // 保存图片
     Gdiplus::Status status = pBitmap->Save (filePath.c_str (), &pngClsid, NULL);
+
+    // 输出保存结果
+    char filePathA[MAX_PATH];
+    WideCharToMultiByte (CP_ACP, 0, filePath.c_str (), -1, filePathA, MAX_PATH, NULL, NULL);
+    ostringstream saveLog;
+    saveLog << "[" << timestamp << "] CaptureImage: 保存图片到 "
+            << "id=" << id << ", 状态=" << (int)status
+            << ", 路径=" << filePathA;
+    DebugLog (saveLog.str ());
 
     // 清理资源
     delete pBitmap;
     GlobalUnlock (hData);
     CloseClipboard ();
-
-    // 输出保存结果
-    ostringstream saveLog;
-    saveLog << "[" << timestamp << "] CaptureImage: 保存图片到 "
-            << "id=" << id << ", 状态=" << (int)status;
-    DebugLog (saveLog.str ());
 
     if (status != Gdiplus::Ok)
     {
@@ -545,6 +576,10 @@ bool ClipboardManager::CaptureImage ()
     record.filePath = filePath;
     record.timestamp = time (NULL);
     record.isPinned = false;
+
+    // 更新上次图片信息（用于去重）
+    m_lastImageHash = currentHash;
+    m_lastImageTime = time (NULL);
 
     // 添加记录
     AddRecord (record);
