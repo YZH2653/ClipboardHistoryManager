@@ -5,9 +5,27 @@
 #include "Storage.h"
 #include <iostream>
 #include <fstream>
+#include <windows.h>
 #include "json.hpp"
 using namespace std;
 using json = nlohmann::json;
+
+// 获取exe所在目录的绝对路径
+static string GetExeDirA ()
+{
+    char path[MAX_PATH];
+    GetModuleFileNameA (NULL, path, MAX_PATH);
+    string fullPath (path);
+    size_t pos = fullPath.find_last_of ("\\");
+    if (pos != string::npos)
+    {
+        return fullPath.substr (0, pos);
+    }
+    return fullPath;
+}
+
+// 全局变量：exe所在目录
+static string g_exeDir = "";
 
 // 构造函数
 Storage::Storage ()
@@ -24,6 +42,8 @@ Storage::~Storage ()
 void Storage::SetRootDir (const wstring& rootDir)
 {
     m_rootDir = rootDir;
+    // 同时设置全局exe目录（ANSI编码）
+    g_exeDir = GetExeDirA ();
 }
 
 // 初始化存储系统
@@ -37,27 +57,25 @@ bool Storage::Initialize ()
 // 确保存储目录存在
 void Storage::EnsureDirectories ()
 {
-    // 创建clips目录
-    wstring clipsDir = m_rootDir + L"\\clips";
-    CreateDirectoryW (clipsDir.c_str (), NULL);
+    // 使用绝对路径创建clips目录
+    string clipsDir = g_exeDir + "\\clips";
+    CreateDirectoryA (clipsDir.c_str (), NULL);
 
-    // 创建images目录
-    wstring imagesDir = m_rootDir + L"\\clips\\images";
-    CreateDirectoryW (imagesDir.c_str (), NULL);
+    // 使用绝对路径创建images目录
+    string imagesDir = g_exeDir + "\\clips\\images";
+    CreateDirectoryA (imagesDir.c_str (), NULL);
 }
 
 // 获取索引文件路径（绝对路径）
 string Storage::GetIndexPath ()
 {
-    wstring fullPath = m_rootDir + L"\\clips\\history.json";
-    return wstring_to_string (fullPath);
+    return g_exeDir + "\\clips\\history.json";
 }
 
 // 获取设置文件路径（绝对路径）
 string Storage::GetSettingsPath ()
 {
-    wstring fullPath = m_rootDir + L"\\clips\\settings.json";
-    return wstring_to_string (fullPath);
+    return g_exeDir + "\\clips\\settings.json";
 }
 
 // 保存记录到文件
@@ -86,7 +104,7 @@ bool Storage::SaveRecords (const vector<ClipRecord>& records)
         string jsonStr = j.dump (4);
         string indexPath = GetIndexPath ();
 
-        // 写入文件（覆盖模式）
+        // 写入文件（覆盖模式，清空旧数据）
         ofstream file (indexPath, ios::out | ios::trunc);
         if (!file.is_open ())
         {
@@ -111,6 +129,24 @@ bool Storage::LoadRecords (vector<ClipRecord>& records)
     try
     {
         string indexPath = GetIndexPath ();
+
+        // 检查文件是否存在，不存在则创建空文件
+        ifstream checkFile (indexPath);
+        if (!checkFile.is_open ())
+        {
+            // 创建空的JSON文件
+            ofstream newFile (indexPath, ios::out | ios::trunc);
+            if (newFile.is_open ())
+            {
+                newFile << "{\"version\":\"1.0\",\"records\":[]}";
+                newFile.flush ();
+                newFile.close ();
+            }
+            return true;
+        }
+        checkFile.close ();
+
+        // 读取文件内容
         ifstream file (indexPath);
         if (!file.is_open ())
         {
