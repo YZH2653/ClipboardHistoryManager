@@ -92,5 +92,5 @@ private:
     ULONG_PTR m_gdiplusToken; // GDI+令牌
     wstring m_lastContent;    // 上次捕获的内容（防止重复）
     wstring m_lastImagePath;  // 上次捕获的图片路径（防止重复）
-    time_t m_lastImageTime;   // 上次捕获图片的时间（防止重复）
+    UINT m_lastClipboardSeq;  // 上次剪贴板序列号（防止重复）
 };
