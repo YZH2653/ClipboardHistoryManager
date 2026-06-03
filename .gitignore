@@ -17,6 +17,7 @@ build/
 # 临时文件
 *.tmp
 *.log
+*.zip
 
 # 本地配置
 .claude/
