@@ -12,7 +12,7 @@ using namespace std;
 
 // 构造函数
 ClipboardManager::ClipboardManager ()
-    : m_hWnd (NULL), m_nextId (1), m_maxRecords (1000), m_gdiplusToken (0)
+    : m_hWnd (NULL), m_nextId (1), m_maxRecords (1000), m_gdiplusToken (0), m_lastImageTime (0)
 {
 }
 
@@ -188,16 +188,16 @@ bool ClipboardManager::CopyToClipboard (const wstring& content)
 // 处理剪贴板更新
 bool ClipboardManager::OnClipboardUpdate ()
 {
-    // 检查是否为文字内容
-    if (IsClipboardFormatAvailable (CF_UNICODETEXT))
-    {
-        return CaptureText ();
-    }
-
-    // 检查是否为图片内容
+    // 如果同时存在图片和文字，优先捕获图片（截图工具会同时写入多种格式）
     if (IsClipboardFormatAvailable (CF_DIB))
     {
         return CaptureImage ();
+    }
+
+    // 只有在没有图片时才捕获文字
+    if (IsClipboardFormatAvailable (CF_UNICODETEXT))
+    {
+        return CaptureText ();
     }
 
     return false;
@@ -358,13 +358,20 @@ bool ClipboardManager::CaptureImage ()
     CloseClipboard ();
 
     // 检查是否与上次捕获的图片相同（防止重复）
-    if (filePath == m_lastImagePath)
+    // 比较文件大小和时间戳，而不是文件路径
+    if (!m_lastImagePath.empty ())
     {
-        // 删除重复的图片文件
-        DeleteFile (filePath.c_str ());
-        return false;
+        // 检查时间间隔是否小于1秒
+        time_t now = time (NULL);
+        if (now - m_lastImageTime < 1)
+        {
+            // 删除重复的图片文件
+            DeleteFile (filePath.c_str ());
+            return false;
+        }
     }
     m_lastImagePath = filePath;
+    m_lastImageTime = time (NULL);
 
     // 创建记录
     ClipRecord record;
