@@ -188,26 +188,27 @@ bool ClipboardManager::CopyToClipboard (const wstring& content)
 // 处理剪贴板更新
 bool ClipboardManager::OnClipboardUpdate ()
 {
-    // 使用剪贴板序列号检测，同一内容只处理一次
-    UINT currentSeq = GetClipboardSequenceNumber ();
-    if (currentSeq == m_lastClipboardSeq)
-    {
-        return false;
-    }
+    // 实验性修复：先移除监听器，处理完再重新添加
+    // 这样即使截图工具有两次连续操作，第二次回调时监听器已移除
+    RemoveClipboardFormatListener (m_hWnd);
+
+    bool result = false;
 
     // 如果同时存在图片和文字，优先捕获图片（截图工具会同时写入多种格式）
     if (IsClipboardFormatAvailable (CF_DIB))
     {
-        return CaptureImage ();
+        result = CaptureImage ();
     }
-
     // 只有在没有图片时才捕获文字
-    if (IsClipboardFormatAvailable (CF_UNICODETEXT))
+    else if (IsClipboardFormatAvailable (CF_UNICODETEXT))
     {
-        return CaptureText ();
+        result = CaptureText ();
     }
 
-    return false;
+    // 重新添加监听器
+    AddClipboardFormatListener (m_hWnd);
+
+    return result;
 }
 
 // 捕获文字内容
@@ -363,15 +364,6 @@ bool ClipboardManager::CaptureImage ()
     delete pBitmap;
     GlobalUnlock (hData);
     CloseClipboard ();
-
-    // 使用剪贴板序列号检测重复
-    UINT currentSeq = GetClipboardSequenceNumber ();
-    if (currentSeq == m_lastClipboardSeq)
-    {
-        DeleteFile (filePath.c_str ());
-        return false;
-    }
-    m_lastClipboardSeq = currentSeq;
 
     // 创建记录
     ClipRecord record;
