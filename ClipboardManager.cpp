@@ -29,11 +29,9 @@ bool ClipboardManager::Initialize (HWND hWnd)
     // 注册剪贴板监听
     if (!AddClipboardFormatListener (m_hWnd))
     {
-        wcout << L"注册剪贴板监听失败" << endl;
         return false;
     }
 
-    wcout << L"剪贴板监听初始化成功" << endl;
     return true;
 }
 
@@ -54,7 +52,6 @@ void ClipboardManager::InitializeGdiplus ()
 {
     Gdiplus::GdiplusStartupInput gdiplusStartupInput;
     Gdiplus::GdiplusStartup (&m_gdiplusToken, &gdiplusStartupInput, NULL);
-    wcout << L"GDI+初始化完成" << endl;
 }
 
 // 清理GDI+
@@ -64,7 +61,6 @@ void ClipboardManager::ShutdownGdiplus ()
     {
         Gdiplus::GdiplusShutdown (m_gdiplusToken);
         m_gdiplusToken = 0;
-        wcout << L"GDI+已清理" << endl;
     }
 }
 
@@ -145,7 +141,6 @@ void ClipboardManager::CleanupOldRecords ()
                 }
                 // 删除记录
                 m_records.erase (--(it.base ()));
-                wcout << L"删除超出限制的记录，当前总数: " << m_records.size () << endl;
                 break;
             }
         }
@@ -188,7 +183,6 @@ bool ClipboardManager::CopyToClipboard (const wstring& content)
     // 关闭剪贴板
     CloseClipboard ();
 
-    wcout << L"已复制到剪贴板" << endl;
     return true;
 }
 
@@ -263,7 +257,6 @@ bool ClipboardManager::CaptureText ()
     // 校验内容合法性
     if (!IsValidContent (content))
     {
-        wcout << L"过滤无效内容: " << content.substr (0, 50) << endl;
         return false;
     }
 
@@ -292,7 +285,6 @@ bool ClipboardManager::CaptureText ()
     // 添加记录
     AddRecord (record);
 
-    wcout << L"捕获文字内容: " << record.preview << endl;
     return true;
 }
 
@@ -388,7 +380,6 @@ bool ClipboardManager::CaptureImage ()
     // 添加记录
     AddRecord (record);
 
-    wcout << L"捕获图片内容: " << filePath << endl;
     return true;
 }
 
@@ -400,8 +391,6 @@ void ClipboardManager::AddRecord (const ClipRecord& record)
 
     // 清理超出限制的记录
     CleanupOldRecords ();
-
-    wcout << L"添加记录，当前总数: " << m_records.size () << endl;
 }
 
 // 生成唯一ID

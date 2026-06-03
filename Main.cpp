@@ -1171,13 +1171,6 @@ int main ()
     wstring exeDir = GetExeDir ();
     SetCurrentDirectoryW (exeDir.c_str ());
 
-    // 重定向控制台输出（调试用）
-    AllocConsole ();
-    freopen ("CONOUT$", "w", stdout);
-
-    wcout << L"历史剪贴板管理器启动中..." << endl;
-    wcout << L"程序目录: " << exeDir << endl;
-
     // 初始化存储系统
     G_Storage.SetRootDir (exeDir);
     G_Storage.Initialize ();
@@ -1203,9 +1196,6 @@ int main ()
             break;
         }
     }
-
-    wcout << L"保留天数: " << G_RetentionDays << endl;
-    wcout << L"最大记录数: " << G_MaxRecords << endl;
 
     // 删除过期记录
     int deletedCount = G_Storage.DeleteExpiredRecords (records, G_RetentionDays);
@@ -1237,14 +1227,12 @@ int main ()
 
     if (hWnd == NULL)
     {
-        wcout << L"窗口创建失败" << endl;
         return 0;
     }
 
     // 初始化剪贴板管理器
     if (!G_ClipManager.Initialize (hWnd))
     {
-        wcout << L"剪贴板监听初始化失败" << endl;
         return 0;
     }
 
@@ -1254,8 +1242,6 @@ int main ()
     // 显示窗口
     ShowWindow (hWnd, SW_SHOW);
     UpdateWindow (hWnd);
-    wcout << L"窗口显示成功" << endl;
-    wcout << L"请尝试复制文字或图片进行测试..." << endl;
 
     // 消息循环
     MSG msg = {};

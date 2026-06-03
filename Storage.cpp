@@ -31,7 +31,6 @@ bool Storage::Initialize ()
 {
     EnsureDirectories ();
     m_initialized = true;
-    wcout << L"存储系统初始化完成" << endl;
     return true;
 }
 
@@ -90,19 +89,16 @@ bool Storage::SaveRecords (const vector<ClipRecord>& records)
         ofstream file (GetIndexPath ());
         if (!file.is_open ())
         {
-            wcout << L"无法打开索引文件进行写入" << endl;
             return false;
         }
 
         file << jsonStr;
         file.close ();
 
-        wcout << L"保存记录成功，共 " << records.size () << " 条" << endl;
         return true;
     }
     catch (const exception& e)
     {
-        wcout << L"保存记录失败: " << e.what () << endl;
         return false;
     }
 }
@@ -115,7 +111,6 @@ bool Storage::LoadRecords (vector<ClipRecord>& records)
         ifstream file (GetIndexPath ());
         if (!file.is_open ())
         {
-            wcout << L"索引文件不存在，将创建新文件" << endl;
             return true;
         }
 
@@ -147,12 +142,10 @@ bool Storage::LoadRecords (vector<ClipRecord>& records)
             }
         }
 
-        wcout << L"加载记录成功，共 " << records.size () << " 条" << endl;
         return true;
     }
     catch (const exception& e)
     {
-        wcout << L"加载记录失败: " << e.what () << endl;
         return false;
     }
 }
@@ -187,11 +180,6 @@ int Storage::DeleteExpiredRecords (vector<ClipRecord>& records, int retentionDay
         }
     }
 
-    if (deletedCount > 0)
-    {
-        wcout << L"删除过期记录: " << deletedCount << " 条" << endl;
-    }
-
     return deletedCount;
 }
 
@@ -224,12 +212,10 @@ bool Storage::SaveSettings (int retentionDays, int maxRecords)
         file << jsonStr;
         file.close ();
 
-        wcout << L"保存设置成功" << endl;
         return true;
     }
     catch (const exception& e)
     {
-        wcout << L"保存设置失败: " << e.what () << endl;
         return false;
     }
 }
@@ -263,12 +249,10 @@ bool Storage::LoadSettings (int& retentionDays, int& maxRecords)
         retentionDays = j.value ("retentionDays", 3);
         maxRecords = j.value ("maxRecords", 1000);
 
-        wcout << L"加载设置成功" << endl;
         return true;
     }
     catch (const exception& e)
     {
-        wcout << L"加载设置失败: " << e.what () << endl;
         retentionDays = 3;
         maxRecords = 1000;
         return false;
