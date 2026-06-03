@@ -84,15 +84,17 @@ bool Storage::SaveRecords (const vector<ClipRecord>& records)
 
         // 转换为UTF-8字符串
         string jsonStr = j.dump (4);
+        string indexPath = GetIndexPath ();
 
-        // 写入文件
-        ofstream file (GetIndexPath ());
+        // 写入文件（覆盖模式）
+        ofstream file (indexPath, ios::out | ios::trunc);
         if (!file.is_open ())
         {
             return false;
         }
 
         file << jsonStr;
+        file.flush ();
         file.close ();
 
         return true;
@@ -108,7 +110,8 @@ bool Storage::LoadRecords (vector<ClipRecord>& records)
 {
     try
     {
-        ifstream file (GetIndexPath ());
+        string indexPath = GetIndexPath ();
+        ifstream file (indexPath);
         if (!file.is_open ())
         {
             return true;
@@ -202,14 +205,16 @@ bool Storage::SaveSettings (int retentionDays, int maxRecords)
         j["maxRecords"] = maxRecords;
 
         string jsonStr = j.dump (4);
+        string settingsPath = GetSettingsPath ();
 
-        ofstream file (GetSettingsPath ());
+        ofstream file (settingsPath, ios::out | ios::trunc);
         if (!file.is_open ())
         {
             return false;
         }
 
         file << jsonStr;
+        file.flush ();
         file.close ();
 
         return true;
@@ -225,10 +230,10 @@ bool Storage::LoadSettings (int& retentionDays, int& maxRecords)
 {
     try
     {
-        ifstream file (GetSettingsPath ());
+        string settingsPath = GetSettingsPath ();
+        ifstream file (settingsPath);
         if (!file.is_open ())
         {
-            // 使用默认设置
             retentionDays = 3;
             maxRecords = 1000;
             return true;
