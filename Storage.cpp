@@ -3,12 +3,11 @@
 #define WINVER 0x0601
 #define _WIN32_WINNT 0x0601
 #include "Storage.h"
-#include <iostream>
-#include <fstream>
 #include <windows.h>
-#include "json.hpp"
+#include <string>
+#include <vector>
+#include "sqlite3.h"
 using namespace std;
-using json = nlohmann::json;
 
 // 获取exe所在目录的绝对路径
 static string GetExeDirA ()
@@ -24,8 +23,9 @@ static string GetExeDirA ()
     return fullPath;
 }
 
-// 全局变量：exe所在目录
+// 全局变量
 static string g_exeDir = "";
+static sqlite3* g_db = NULL;
 
 // 构造函数
 Storage::Storage ()
@@ -36,13 +36,17 @@ Storage::Storage ()
 // 析构函数
 Storage::~Storage ()
 {
+    if (g_db)
+    {
+        sqlite3_close (g_db);
+        g_db = NULL;
+    }
 }
 
 // 设置程序根目录
 void Storage::SetRootDir (const wstring& rootDir)
 {
     m_rootDir = rootDir;
-    // 同时设置全局exe目录（ANSI编码）
     g_exeDir = GetExeDirA ();
 }
 
@@ -50,6 +54,50 @@ void Storage::SetRootDir (const wstring& rootDir)
 bool Storage::Initialize ()
 {
     EnsureDirectories ();
+
+    string dbPath = g_exeDir + "\\clips\\history.db";
+
+    // 打开数据库（如果不存在则创建）
+    int rc = sqlite3_open (dbPath.c_str (), &g_db);
+    if (rc)
+    {
+        return false;
+    }
+
+    // 创建表（如果不存在）
+    const char* createTableSQL =
+        "CREATE TABLE IF NOT EXISTS records ("
+        "id INTEGER PRIMARY KEY,"
+        "type INTEGER,"
+        "content TEXT,"
+        "preview TEXT,"
+        "filePath TEXT,"
+        "timestamp INTEGER,"
+        "isPinned INTEGER"
+        ");";
+
+    char* errMsg = NULL;
+    rc = sqlite3_exec (g_db, createTableSQL, NULL, NULL, &errMsg);
+    if (rc)
+    {
+        if (errMsg) sqlite3_free (errMsg);
+        return false;
+    }
+
+    // 创建设置表
+    const char* createSettingsSQL =
+        "CREATE TABLE IF NOT EXISTS settings ("
+        "key TEXT PRIMARY KEY,"
+        "value INTEGER"
+        ");";
+
+    rc = sqlite3_exec (g_db, createSettingsSQL, NULL, NULL, &errMsg);
+    if (rc)
+    {
+        if (errMsg) sqlite3_free (errMsg);
+        return false;
+    }
+
     m_initialized = true;
     return true;
 }
@@ -57,136 +105,101 @@ bool Storage::Initialize ()
 // 确保存储目录存在
 void Storage::EnsureDirectories ()
 {
-    // 使用绝对路径创建clips目录
     string clipsDir = g_exeDir + "\\clips";
     CreateDirectoryA (clipsDir.c_str (), NULL);
-
-    // 使用绝对路径创建images目录
-    string imagesDir = g_exeDir + "\\clips\\images";
-    CreateDirectoryA (imagesDir.c_str (), NULL);
 }
 
-// 获取索引文件路径（绝对路径）
-string Storage::GetIndexPath ()
-{
-    return g_exeDir + "\\clips\\history.json";
-}
-
-// 获取设置文件路径（绝对路径）
-string Storage::GetSettingsPath ()
-{
-    return g_exeDir + "\\clips\\settings.json";
-}
-
-// 保存记录到文件
+// 保存记录到数据库
 bool Storage::SaveRecords (const vector<ClipRecord>& records)
 {
-    try
+    if (!g_db) return false;
+
+    // 开始事务
+    sqlite3_exec (g_db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+
+    // 清空旧记录
+    sqlite3_exec (g_db, "DELETE FROM records;", NULL, NULL, NULL);
+
+    // 插入新记录
+    const char* insertSQL = "INSERT INTO records (id, type, content, preview, filePath, timestamp, isPinned) VALUES (?, ?, ?, ?, ?, ?, ?);";
+    sqlite3_stmt* stmt = NULL;
+
+    int rc = sqlite3_prepare_v2 (g_db, insertSQL, -1, &stmt, NULL);
+    if (rc)
     {
-        json j;
-        j["version"] = "1.0";
-        j["records"] = json::array ();
-
-        for (const auto& record : records)
-        {
-            json item;
-            item["id"] = record.id;
-            item["type"] = (int)record.type;
-            item["content"] = wstring_to_utf8 (record.content);
-            item["preview"] = wstring_to_utf8 (record.preview);
-            item["filePath"] = wstring_to_utf8 (record.filePath);
-            item["timestamp"] = record.timestamp;
-            item["isPinned"] = record.isPinned;
-            j["records"].push_back (item);
-        }
-
-        // 转换为UTF-8字符串
-        string jsonStr = j.dump (4);
-        string indexPath = GetIndexPath ();
-
-        // 写入文件（覆盖模式，清空旧数据）
-        ofstream file (indexPath, ios::out | ios::trunc);
-        if (!file.is_open ())
-        {
-            return false;
-        }
-
-        file << jsonStr;
-        file.flush ();
-        file.close ();
-
-        return true;
-    }
-    catch (const exception& e)
-    {
+        sqlite3_exec (g_db, "ROLLBACK;", NULL, NULL, NULL);
         return false;
     }
+
+    for (const auto& record : records)
+    {
+        sqlite3_reset (stmt);
+        sqlite3_clear_bindings (stmt);
+
+        sqlite3_bind_int (stmt, 1, record.id);
+        sqlite3_bind_int (stmt, 2, (int)record.type);
+
+        // 将宽字符串转换为UTF-8
+        string content_utf8 = wstring_to_utf8 (record.content);
+        string preview_utf8 = wstring_to_utf8 (record.preview);
+        string filePath_utf8 = wstring_to_utf8 (record.filePath);
+
+        sqlite3_bind_text (stmt, 3, content_utf8.c_str (), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text (stmt, 4, preview_utf8.c_str (), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text (stmt, 5, filePath_utf8.c_str (), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int64 (stmt, 6, (sqlite3_int64)record.timestamp);
+        sqlite3_bind_int (stmt, 7, record.isPinned ? 1 : 0);
+
+        sqlite3_step (stmt);
+    }
+
+    sqlite3_finalize (stmt);
+
+    // 提交事务
+    sqlite3_exec (g_db, "COMMIT;", NULL, NULL, NULL);
+
+    return true;
 }
 
-// 从文件加载记录
+// 从数据库加载记录
 bool Storage::LoadRecords (vector<ClipRecord>& records)
 {
-    try
-    {
-        string indexPath = GetIndexPath ();
+    if (!g_db) return false;
 
-        // 检查文件是否存在，不存在则创建空文件
-        ifstream checkFile (indexPath);
-        if (!checkFile.is_open ())
-        {
-            // 创建空的JSON文件
-            ofstream newFile (indexPath, ios::out | ios::trunc);
-            if (newFile.is_open ())
-            {
-                newFile << "{\"version\":\"1.0\",\"records\":[]}";
-                newFile.flush ();
-                newFile.close ();
-            }
-            return true;
-        }
-        checkFile.close ();
+    const char* selectSQL = "SELECT id, type, content, preview, filePath, timestamp, isPinned FROM records ORDER BY timestamp DESC;";
+    sqlite3_stmt* stmt = NULL;
 
-        // 读取文件内容
-        ifstream file (indexPath);
-        if (!file.is_open ())
-        {
-            return true;
-        }
-
-        string jsonStr;
-        getline (file, jsonStr);
-        file.close ();
-
-        if (jsonStr.empty ())
-        {
-            return true;
-        }
-
-        json j = json::parse (jsonStr);
-        records.clear ();
-
-        if (j.contains ("records"))
-        {
-            for (const auto& item : j["records"])
-            {
-                ClipRecord record;
-                record.id = item["id"];
-                record.type = (ClipType)(int)item["type"];
-                record.content = utf8_to_wstring (item["content"].get<string> ());
-                record.preview = utf8_to_wstring (item["preview"].get<string> ());
-                record.filePath = utf8_to_wstring (item["filePath"].get<string> ());
-                record.timestamp = item["timestamp"];
-                record.isPinned = item["isPinned"];
-                records.push_back (record);
-            }
-        }
-
-        return true;
-    }
-    catch (const exception& e)
+    int rc = sqlite3_prepare_v2 (g_db, selectSQL, -1, &stmt, NULL);
+    if (rc)
     {
         return false;
     }
+
+    records.clear ();
+
+    while (sqlite3_step (stmt) == SQLITE_ROW)
+    {
+        ClipRecord record;
+        record.id = sqlite3_column_int (stmt, 0);
+        record.type = (ClipType)sqlite3_column_int (stmt, 1);
+
+        // 将UTF-8转换为宽字符串
+        const char* content = (const char*)sqlite3_column_text (stmt, 2);
+        const char* preview = (const char*)sqlite3_column_text (stmt, 3);
+        const char* filePath = (const char*)sqlite3_column_text (stmt, 4);
+
+        record.content = content ? utf8_to_wstring (content) : L"";
+        record.preview = preview ? utf8_to_wstring (preview) : L"";
+        record.filePath = filePath ? utf8_to_wstring (filePath) : L"";
+
+        record.timestamp = (time_t)sqlite3_column_int64 (stmt, 5);
+        record.isPinned = sqlite3_column_int (stmt, 6) == 1;
+
+        records.push_back (record);
+    }
+
+    sqlite3_finalize (stmt);
+    return true;
 }
 
 // 删除过期记录
@@ -194,7 +207,7 @@ int Storage::DeleteExpiredRecords (vector<ClipRecord>& records, int retentionDay
 {
     if (retentionDays <= 0)
     {
-        return 0;  // 永不过期
+        return 0;
     }
 
     time_t now = time (NULL);
@@ -206,10 +219,7 @@ int Storage::DeleteExpiredRecords (vector<ClipRecord>& records, int retentionDay
     {
         if (!it->isPinned && it->timestamp < expireTime)
         {
-            // 删除图片文件
             DeleteRecordFile (*it);
-
-            // 删除记录
             it = records.erase (it);
             deletedCount++;
         }
@@ -234,70 +244,73 @@ void Storage::DeleteRecordFile (const ClipRecord& record)
 // 保存设置
 bool Storage::SaveSettings (int retentionDays, int maxRecords)
 {
-    try
-    {
-        json j;
-        j["retentionDays"] = retentionDays;
-        j["maxRecords"] = maxRecords;
+    if (!g_db) return false;
 
-        string jsonStr = j.dump (4);
-        string settingsPath = GetSettingsPath ();
+    const char* upsertSQL = "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?);";
+    sqlite3_stmt* stmt = NULL;
 
-        ofstream file (settingsPath, ios::out | ios::trunc);
-        if (!file.is_open ())
-        {
-            return false;
-        }
+    int rc = sqlite3_prepare_v2 (g_db, upsertSQL, -1, &stmt, NULL);
+    if (rc) return false;
 
-        file << jsonStr;
-        file.flush ();
-        file.close ();
+    // 保存retentionDays
+    sqlite3_reset (stmt);
+    sqlite3_clear_bindings (stmt);
+    sqlite3_bind_text (stmt, 1, "retentionDays", -1, SQLITE_STATIC);
+    sqlite3_bind_int (stmt, 2, retentionDays);
+    sqlite3_step (stmt);
 
-        return true;
-    }
-    catch (const exception& e)
-    {
-        return false;
-    }
+    // 保存maxRecords
+    sqlite3_reset (stmt);
+    sqlite3_clear_bindings (stmt);
+    sqlite3_bind_text (stmt, 1, "maxRecords", -1, SQLITE_STATIC);
+    sqlite3_bind_int (stmt, 2, maxRecords);
+    sqlite3_step (stmt);
+
+    sqlite3_finalize (stmt);
+    return true;
 }
 
 // 加载设置
 bool Storage::LoadSettings (int& retentionDays, int& maxRecords)
 {
-    try
-    {
-        string settingsPath = GetSettingsPath ();
-        ifstream file (settingsPath);
-        if (!file.is_open ())
-        {
-            retentionDays = 3;
-            maxRecords = 1000;
-            return true;
-        }
-
-        string jsonStr;
-        getline (file, jsonStr);
-        file.close ();
-
-        if (jsonStr.empty ())
-        {
-            retentionDays = 3;
-            maxRecords = 1000;
-            return true;
-        }
-
-        json j = json::parse (jsonStr);
-        retentionDays = j.value ("retentionDays", 3);
-        maxRecords = j.value ("maxRecords", 1000);
-
-        return true;
-    }
-    catch (const exception& e)
+    if (!g_db)
     {
         retentionDays = 3;
         maxRecords = 1000;
-        return false;
+        return true;
     }
+
+    const char* selectSQL = "SELECT key, value FROM settings;";
+    sqlite3_stmt* stmt = NULL;
+
+    int rc = sqlite3_prepare_v2 (g_db, selectSQL, -1, &stmt, NULL);
+    if (rc)
+    {
+        retentionDays = 3;
+        maxRecords = 1000;
+        return true;
+    }
+
+    retentionDays = 3;
+    maxRecords = 1000;
+
+    while (sqlite3_step (stmt) == SQLITE_ROW)
+    {
+        const char* key = (const char*)sqlite3_column_text (stmt, 0);
+        int value = sqlite3_column_int (stmt, 1);
+
+        if (key && string (key) == "retentionDays")
+        {
+            retentionDays = value;
+        }
+        else if (key && string (key) == "maxRecords")
+        {
+            maxRecords = value;
+        }
+    }
+
+    sqlite3_finalize (stmt);
+    return true;
 }
 
 // 宽字符串转UTF-8
