@@ -283,8 +283,8 @@ wstring utf8_to_wstring (const string& str)
 string wstring_to_string (const wstring& wstr)
 {
     if (wstr.empty ()) return string ();
-    int size = WideCharToMultiByte (CP_UTF8, 0, wstr.c_str (), (int)wstr.length (), NULL, 0, NULL, NULL);
+    int size = WideCharToMultiByte (CP_ACP, 0, wstr.c_str (), (int)wstr.length (), NULL, 0, NULL, NULL);
     string result (size, 0);
-    WideCharToMultiByte (CP_UTF8, 0, wstr.c_str (), (int)wstr.length (), &result[0], size, NULL, NULL);
+    WideCharToMultiByte (CP_ACP, 0, wstr.c_str (), (int)wstr.length (), &result[0], size, NULL, NULL);
     return result;
 }
