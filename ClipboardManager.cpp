@@ -8,7 +8,81 @@
 #include <sstream>
 #include <algorithm>
 #include <GdiPlus.h>
+#include <chrono>
+#include <iomanip>
 using namespace std;
+
+// 诊断日志相关
+static int g_callbackCount = 0;
+static string g_logFilePath = "";
+
+// 初始化日志文件路径
+static void InitLogPath ()
+{
+    if (g_logFilePath.empty ())
+    {
+        char tempPath[MAX_PATH];
+        GetTempPathA (MAX_PATH, tempPath);
+        g_logFilePath = string (tempPath) + "clipboard_debug.log";
+    }
+}
+
+// 输出日志到控制台和文件
+static void DebugLog (const string& msg)
+{
+    // 输出到控制台
+    OutputDebugStringA (msg.c_str ());
+    OutputDebugStringA ("\n");
+
+    // 追加写入文件
+    ofstream logFile (g_logFilePath, ios::app);
+    if (logFile.is_open ())
+    {
+        logFile << msg << endl;
+        logFile.close ();
+    }
+}
+
+// 获取当前时间戳（毫秒级）
+static string GetTimestamp ()
+{
+    auto now = chrono::system_clock::now ();
+    auto time = chrono::system_clock::to_time_t (now);
+    auto ms = chrono::duration_cast<chrono::milliseconds> (now.time_since_epoch ()) % 1000;
+
+    struct tm timeInfo;
+    localtime_s (&timeInfo, &time);
+
+    ostringstream oss;
+    oss << put_time (&timeInfo, "%H:%M:%S")
+        << "." << setfill ('0') << setw (3) << ms.count ();
+    return oss.str ();
+}
+
+// 获取格式名称
+static string GetFormatName (UINT format)
+{
+    switch (format)
+    {
+    case CF_TEXT: return "CF_TEXT";
+    case CF_BITMAP: return "CF_BITMAP";
+    case CF_UNICODETEXT: return "CF_UNICODETEXT";
+    case CF_DIB: return "CF_DIB";
+    case CF_DIBV5: return "CF_DIBV5";
+    case CF_HDROP: return "CF_HDROP";
+    case CF_LOCALE: return "CF_LOCALE";
+    default:
+    {
+        char name[256];
+        int len = GetClipboardFormatNameA (format, name, 256);
+        if (len > 0)
+        {
+            return string (name, len);
+        }
+        return "Unknown(" + to_string (format) + ")";
+    }
+    }
+}
 
 // 构造函数
 ClipboardManager::ClipboardManager ()
@@ -188,22 +262,95 @@ bool ClipboardManager::CopyToClipboard (const wstring& content)
 // 处理剪贴板更新
 bool ClipboardManager::OnClipboardUpdate ()
 {
+    // 初始化日志
+    InitLogPath ();
+
+    // 递增回调计数器
+    g_callbackCount++;
+
+    // 获取诊断信息
+    string timestamp = GetTimestamp ();
+    DWORD threadId = GetCurrentThreadId ();
+    UINT currentSeq = GetClipboardSequenceNumber ();
+
+    // 输出回调基本信息
+    ostringstream logMsg;
+    logMsg << "[" << timestamp << "] 回调 #" << g_callbackCount
+           << " | 线程=0x" << hex << threadId
+           << " | 序列号=" << dec << currentSeq;
+    DebugLog (logMsg.str ());
+
+    // 枚举剪贴板格式
+    if (OpenClipboard (m_hWnd))
+    {
+        ostringstream formatLog;
+        formatLog << "[" << timestamp << "] 格式枚举: ";
+
+        UINT format = 0;
+        bool first = true;
+        while ((format = EnumClipboardFormats (format)) != 0)
+        {
+            if (!first)
+            {
+                formatLog << ", ";
+            }
+            formatLog << format << " (" << GetFormatName (format) << ")";
+            first = false;
+        }
+
+        DebugLog (formatLog.str ());
+        CloseClipboard ();
+    }
+
     // 实验性修复：先移除监听器，处理完再重新添加
-    // 这样即使截图工具有两次连续操作，第二次回调时监听器已移除
     RemoveClipboardFormatListener (m_hWnd);
 
     bool result = false;
+    string skipReason = "";
 
     // 如果同时存在图片和文字，优先捕获图片（截图工具会同时写入多种格式）
     if (IsClipboardFormatAvailable (CF_DIB))
     {
-        result = CaptureImage ();
+        // 检查是否与上次内容相同
+        if (currentSeq == m_lastClipboardSeq)
+        {
+            skipReason = "序列号相同，跳过保存";
+        }
+        else
+        {
+            result = CaptureImage ();
+            if (result)
+            {
+                m_lastClipboardSeq = currentSeq;
+            }
+        }
     }
     // 只有在没有图片时才捕获文字
     else if (IsClipboardFormatAvailable (CF_UNICODETEXT))
     {
         result = CaptureText ();
     }
+    else
+    {
+        skipReason = "没有可识别的格式";
+    }
+
+    // 输出保存结果
+    ostringstream resultLog;
+    resultLog << "[" << timestamp << "] ";
+    if (result)
+    {
+        resultLog << "保存成功";
+    }
+    else
+    {
+        resultLog << "跳过保存";
+        if (!skipReason.empty ())
+        {
+            resultLog << " (" << skipReason << ")";
+        }
+    }
+    DebugLog (resultLog.str ());
 
     // 重新添加监听器
     AddClipboardFormatListener (m_hWnd);
@@ -298,9 +445,12 @@ bool ClipboardManager::CaptureText ()
 // 捕获图片内容
 bool ClipboardManager::CaptureImage ()
 {
+    string timestamp = GetTimestamp ();
+
     // 打开剪贴板
     if (!OpenClipboard (m_hWnd))
     {
+        DebugLog ("[" + timestamp + "] CaptureImage: 打开剪贴板失败");
         return false;
     }
 
@@ -308,6 +458,7 @@ bool ClipboardManager::CaptureImage ()
     HANDLE hData = GetClipboardData (CF_DIB);
     if (hData == NULL)
     {
+        DebugLog ("[" + timestamp + "] CaptureImage: 获取CF_DIB数据失败");
         CloseClipboard ();
         return false;
     }
@@ -316,12 +467,20 @@ bool ClipboardManager::CaptureImage ()
     void* pData = GlobalLock (hData);
     if (pData == NULL)
     {
+        DebugLog ("[" + timestamp + "] CaptureImage: 锁定内存失败");
         CloseClipboard ();
         return false;
     }
 
     // 获取DIB信息
     BITMAPINFO* pBmi = (BITMAPINFO*)pData;
+
+    // 输出图片信息
+    ostringstream imgInfo;
+    imgInfo << "[" << timestamp << "] CaptureImage: 图片尺寸="
+            << pBmi->bmiHeader.biWidth << "x" << pBmi->bmiHeader.biHeight
+            << ", 位深=" << pBmi->bmiHeader.biBitCount;
+    DebugLog (imgInfo.str ());
 
     // 使用GDI+从DIB数据创建Bitmap
     Gdiplus::Bitmap* pBitmap = Gdiplus::Bitmap::FromBITMAPINFO (pBmi, pData);
@@ -338,6 +497,7 @@ bool ClipboardManager::CaptureImage ()
     Gdiplus::GetImageEncodersSize (&num, &size);
     if (size == 0)
     {
+        DebugLog ("[" + timestamp + "] CaptureImage: 获取图片编码器失败");
         delete pBitmap;
         GlobalUnlock (hData);
         CloseClipboard ();
@@ -358,12 +518,23 @@ bool ClipboardManager::CaptureImage ()
     free (pImageCodecInfo);
 
     // 保存图片
-    pBitmap->Save (filePath.c_str (), &pngClsid, NULL);
+    Gdiplus::Status status = pBitmap->Save (filePath.c_str (), &pngClsid, NULL);
 
     // 清理资源
     delete pBitmap;
     GlobalUnlock (hData);
     CloseClipboard ();
+
+    // 输出保存结果
+    ostringstream saveLog;
+    saveLog << "[" << timestamp << "] CaptureImage: 保存图片到 "
+            << "id=" << id << ", 状态=" << (int)status;
+    DebugLog (saveLog.str ());
+
+    if (status != Gdiplus::Ok)
+    {
+        return false;
+    }
 
     // 创建记录
     ClipRecord record;
