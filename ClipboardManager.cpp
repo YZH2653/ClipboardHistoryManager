@@ -110,7 +110,6 @@ bool ClipboardManager::IsDuplicate (const wstring& content)
     {
         if (m_records[i].type == CLIP_TEXT && m_records[i].content == content)
         {
-            wcout << L"内容与最近记录重复，跳过捕获" << endl;
             return true;
         }
     }
