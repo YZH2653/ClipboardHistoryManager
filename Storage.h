@@ -20,31 +20,31 @@ public:
     bool Initialize ();
 
     // 设置程序根目录
-    void SetRootDir (const wstring& rootDir);
+    void SetRootDir (const wstring & rootDir);
 
     // 保存记录到文件
-    bool SaveRecords (const vector<ClipRecord>& records);
+    bool SaveRecords (const vector<ClipRecord> & records);
 
     // 从文件加载记录
-    bool LoadRecords (vector<ClipRecord>& records);
+    bool LoadRecords (vector<ClipRecord> & records);
 
     // 删除过期记录
-    int DeleteExpiredRecords (vector<ClipRecord>& records, int retentionDays);
+    int DeleteExpiredRecords (vector<ClipRecord> & records, int retentionDays);
 
     // 删除记录对应的图片文件
-    void DeleteRecordFile (const ClipRecord& record);
+    void DeleteRecordFile (const ClipRecord & record);
 
     // 保存设置
     bool SaveSettings (int retentionDays, int maxRecords);
 
     // 加载设置
-    bool LoadSettings (int& retentionDays, int& maxRecords);
+    bool LoadSettings (int & retentionDays, int & maxRecords);
 
     // 保存开机自启设置
     bool SaveAutoStartSetting (bool enabled);
 
     // 加载开机自启设置
-    bool LoadAutoStartSetting (bool& enabled);
+    bool LoadAutoStartSetting (bool & enabled);
 
     // 设置开机自启（写入/删除注册表）
     static bool SetAutoStart (bool enabled);
@@ -67,10 +67,10 @@ private:
 };
 
 // 宽字符串转UTF-8
-string wstring_to_utf8 (const wstring& wstr);
+string wstring_to_utf8 (const wstring & wstr);
 
 // UTF-8转宽字符串
-wstring utf8_to_wstring (const string& str);
+wstring utf8_to_wstring (const string & str);
 
 // 宽字符串转窄字符串（用于文件操作）
-string wstring_to_string (const wstring& wstr);
+string wstring_to_string (const wstring & wstr);

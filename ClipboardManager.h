@@ -39,25 +39,25 @@ public:
     bool Initialize (HWND hWnd);
 
     // 设置程序根目录
-    void SetRootDir (const wstring& rootDir);
+    void SetRootDir (const wstring & RootDir);
 
     // 设置最大记录数
-    void SetMaxRecords (int maxRecords);
+    void SetMaxRecords (int MaxRecords);
 
     // 处理剪贴板更新
     bool OnClipboardUpdate ();
 
     // 添加记录（从外部加载）
-    void AddRecord (const ClipRecord& record);
+    void AddRecord (const ClipRecord & record);
 
     // 获取所有历史记录
-    const vector<ClipRecord>& GetRecords () const;
+    const vector<ClipRecord> & GetRecords () const;
 
     // 获取记录数量
     int GetRecordCount () const;
 
     // 复制内容到剪贴板
-    bool CopyToClipboard (const wstring& content);
+    bool CopyToClipboard (const wstring & content);
 
     // 初始化GDI+
     void InitializeGdiplus ();
@@ -76,10 +76,10 @@ private:
     int GenerateId ();
 
     // 校验内容合法性
-    bool IsValidContent (const wstring& content);
+    bool IsValidContent (const wstring & content);
 
     // 检查是否与最近记录重复
-    bool IsDuplicate (const wstring& content);
+    bool IsDuplicate (const wstring & content);
 
     // 清理超出限制的记录
     void CleanupOldRecords ();
