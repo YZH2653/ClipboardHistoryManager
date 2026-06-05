@@ -355,12 +355,13 @@ void DrawSettingsPage (HDC hdc)
     TextOut (hdc, 100, 12, L"设置", 2);
     DeleteObject (titleFont);
 
-    // 绘制分割线
+    // 创建分割线画笔（整个函数复用）
     HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
+
+    // 绘制分割线
     SelectObject (hdc, linePen);
     MoveToEx (hdc, 20, 55, NULL);
     LineTo (hdc, G_WindowWidth - 20, 55);
-    DeleteObject (linePen);
 
     // 保存时间设置
     SetTextColor (hdc, RGB (33, 33, 33));
@@ -382,10 +383,11 @@ void DrawSettingsPage (HDC hdc)
     FillRect (hdc, &bgRect, bgBrush);
     DeleteObject (bgBrush);
 
-    // 绘制边框
+    // 绘制边框（临时切换画笔，用完恢复）
     HPEN borderPen = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
-    SelectObject (hdc, borderPen);
+    HPEN prevPen = (HPEN)SelectObject (hdc, borderPen);
     Rectangle (hdc, dropdownX, dropdownY, dropdownX + dropdownWidth, dropdownY + dropdownHeight);
+    SelectObject (hdc, prevPen);
     DeleteObject (borderPen);
 
     // 绘制当前选中的值
@@ -401,10 +403,8 @@ void DrawSettingsPage (HDC hdc)
     DeleteObject (valueFont);
 
     // 绘制分割线
-    SelectObject (hdc, linePen);
     MoveToEx (hdc, 20, 140, NULL);
     LineTo (hdc, G_WindowWidth - 20, 140);
-    DeleteObject (linePen);
 
     // 开机自启设置
     SetTextColor (hdc, RGB (33, 33, 33));
@@ -425,12 +425,14 @@ void DrawSettingsPage (HDC hdc)
     FillRect (hdc, &toggleRect, toggleBgBrush);
     DeleteObject (toggleBgBrush);
 
-    // 绘制开关圆角边框
+    // 绘制开关圆角边框（临时切换画笔和画刷，用完恢复）
     HPEN togglePen = CreatePen (PS_SOLID, 1, toggleBgColor);
-    SelectObject (hdc, togglePen);
     HBRUSH nullBrush = (HBRUSH)GetStockObject (NULL_BRUSH);
-    SelectObject (hdc, nullBrush);
+    prevPen = (HPEN)SelectObject (hdc, togglePen);
+    HBRUSH prevBrush = (HBRUSH)SelectObject (hdc, nullBrush);
     RoundRect (hdc, toggleX, toggleY, toggleX + toggleWidth, toggleY + toggleHeight, toggleHeight, toggleHeight);
+    SelectObject (hdc, prevBrush);
+    SelectObject (hdc, prevPen);
     DeleteObject (togglePen);
 
     // 绘制开关文字
@@ -448,10 +450,8 @@ void DrawSettingsPage (HDC hdc)
     DeleteObject (autoStartFont);
 
     // 绘制分割线
-    SelectObject (hdc, linePen);
     MoveToEx (hdc, 20, 200, NULL);
     LineTo (hdc, G_WindowWidth - 20, 200);
-    DeleteObject (linePen);
 
     // 版本信息入口
     int versionY = 220;
@@ -465,10 +465,8 @@ void DrawSettingsPage (HDC hdc)
     TextOut (hdc, G_WindowWidth - 40, versionY, L"→", 1);
 
     // 绘制分割线
-    SelectObject (hdc, linePen);
     MoveToEx (hdc, 20, versionY + 40, NULL);
     LineTo (hdc, G_WindowWidth - 20, versionY + 40);
-    DeleteObject (linePen);
 
     // 问题反馈入口
     int feedbackY = 280;
@@ -481,10 +479,8 @@ void DrawSettingsPage (HDC hdc)
     DeleteObject (versionFont);
 
     // 绘制分割线
-    SelectObject (hdc, linePen);
     MoveToEx (hdc, 20, feedbackY + 40, NULL);
     LineTo (hdc, G_WindowWidth - 20, feedbackY + 40);
-    DeleteObject (linePen);
 
     // GitHub 仓库地址
     int githubY = G_WindowHeight - 60;
@@ -519,8 +515,9 @@ void DrawSettingsPage (HDC hdc)
 
             // 绘制边框
             HPEN optBorderPen = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
-            SelectObject (hdc, optBorderPen);
+            HPEN savedPen = (HPEN)SelectObject (hdc, optBorderPen);
             Rectangle (hdc, dropdownX, optionY, dropdownX + dropdownWidth, optionY + optionHeight);
+            SelectObject (hdc, savedPen);
             DeleteObject (optBorderPen);
 
             // 绘制文字（当前选中的加一个✓标记）
@@ -545,6 +542,9 @@ void DrawSettingsPage (HDC hdc)
             DeleteObject (optionFont);
         }
     }
+
+    // 清理分割线画笔
+    DeleteObject (linePen);
 }
 
 // 绘制版本号页面
