@@ -313,6 +313,116 @@ bool Storage::LoadSettings (int& retentionDays, int& maxRecords)
     return true;
 }
 
+// 保存开机自启设置到数据库
+bool Storage::SaveAutoStartSetting (bool enabled)
+{
+    if (!g_db) return false;
+
+    const char* upsertSQL = "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?);";
+    sqlite3_stmt* stmt = NULL;
+
+    int rc = sqlite3_prepare_v2 (g_db, upsertSQL, -1, &stmt, NULL);
+    if (rc) return false;
+
+    sqlite3_reset (stmt);
+    sqlite3_clear_bindings (stmt);
+    sqlite3_bind_text (stmt, 1, "autoStart", -1, SQLITE_STATIC);
+    sqlite3_bind_int (stmt, 2, enabled ? 1 : 0);
+    sqlite3_step (stmt);
+
+    sqlite3_finalize (stmt);
+    return true;
+}
+
+// 从数据库加载开机自启设置
+bool Storage::LoadAutoStartSetting (bool& enabled)
+{
+    if (!g_db)
+    {
+        enabled = false;
+        return true;
+    }
+
+    const char* selectSQL = "SELECT value FROM settings WHERE key = 'autoStart';";
+    sqlite3_stmt* stmt = NULL;
+
+    int rc = sqlite3_prepare_v2 (g_db, selectSQL, -1, &stmt, NULL);
+    if (rc)
+    {
+        enabled = false;
+        return true;
+    }
+
+    enabled = false;
+    if (sqlite3_step (stmt) == SQLITE_ROW)
+    {
+        enabled = (sqlite3_column_int (stmt, 0) == 1);
+    }
+
+    sqlite3_finalize (stmt);
+    return true;
+}
+
+// 设置开机自启（写入/删除注册表）
+bool Storage::SetAutoStart (bool enabled)
+{
+    HKEY hKey;
+    LPCWSTR regPath = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+
+    LONG result = RegOpenKeyExW (HKEY_CURRENT_USER, regPath, 0, KEY_SET_VALUE | KEY_QUERY_VALUE, &hKey);
+    if (result != ERROR_SUCCESS)
+    {
+        return false;
+    }
+
+    if (enabled)
+    {
+        // 获取exe绝对路径
+        wchar_t exePath[MAX_PATH];
+        GetModuleFileNameW (NULL, exePath, MAX_PATH);
+
+        // 写入注册表
+        result = RegSetValueExW (hKey, L"ClipboardHistoryManager", 0, REG_SZ,
+            (const BYTE*)exePath, (DWORD)(wcslen (exePath) + 1) * sizeof (wchar_t));
+    }
+    else
+    {
+        // 删除注册表项
+        result = RegDeleteValueW (hKey, L"ClipboardHistoryManager");
+        // 如果值不存在也算成功
+        if (result == ERROR_FILE_NOT_FOUND)
+        {
+            result = ERROR_SUCCESS;
+        }
+    }
+
+    RegCloseKey (hKey);
+    return (result == ERROR_SUCCESS);
+}
+
+// 检查是否已设置开机自启
+bool Storage::IsAutoStartEnabled ()
+{
+    HKEY hKey;
+    LPCWSTR regPath = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+
+    LONG result = RegOpenKeyExW (HKEY_CURRENT_USER, regPath, 0, KEY_QUERY_VALUE, &hKey);
+    if (result != ERROR_SUCCESS)
+    {
+        return false;
+    }
+
+    wchar_t value[MAX_PATH];
+    DWORD valueSize = sizeof (value);
+    DWORD valueType = 0;
+
+    result = RegQueryValueExW (hKey, L"ClipboardHistoryManager", NULL, &valueType,
+        (LPBYTE)value, &valueSize);
+
+    RegCloseKey (hKey);
+    return (result == ERROR_SUCCESS);
+}
+
 // 宽字符串转UTF-8
 string wstring_to_utf8 (const wstring& wstr)
 {
