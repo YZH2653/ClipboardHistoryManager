@@ -19,8 +19,11 @@
 ### 编译运行
 
 ```bash
+# 编译 sqlite3.c（需要单独编译为 C 文件）
+gcc -c -o sqlite3.o sqlite3.c
+
 # 编译程序（需要 MinGW-w64）
-g++ -std=c++17 -static -mwindows -o output/ClipboardHistory.exe Main.cpp ClipboardManager.cpp Storage.cpp sqlite3.c -lgdiplus -lgdi32 -luser32 -lole32
+g++ -std=c++17 -o output/ClipboardHistory.exe Main.cpp ClipboardManager.cpp Storage.cpp sqlite3.o -luser32 -lkernel32 -lgdi32 -lgdiplus -lshell32 -ladvapi32 -mwindows
 
 # 运行程序
 ./output/ClipboardHistory.exe
@@ -87,6 +90,12 @@ ClipboardHistoryManager/
 - **文字限制**：单条文字最多保存10000字符
 
 ## 📝 更新日志
+
+### v1.3.0 (2026-06-05)
+- ✨ 新增开机自启动功能
+- ✨ 设置页面添加开机自启开关（开/关状态）
+- ✨ 通过 Windows 注册表实现自启动
+- ✨ 启动时自动同步注册表与数据库设置
 
 ### v1.2.0 (2026-06-03)
 - 🐛 使用 SQLite 数据库替代 JSON 文件，解决数据丢失问题

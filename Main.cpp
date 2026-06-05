@@ -18,8 +18,8 @@ ClipboardManager G_ClipManager;
 Storage G_Storage;
 
 // 版本号
-const wchar_t* APP_VERSION = L"1.2.0.0";
-const wchar_t* APP_UPDATE_DATE = L"2026-06-03";
+const wchar_t* APP_VERSION = L"1.3.0.0";
+const wchar_t* APP_UPDATE_DATE = L"2026-06-05";
 const wchar_t* APP_AUTHOR = L"YZH2653";
 const wchar_t* APP_AUTHOR_EMAIL = L"yzh2653@163.com";
 const wchar_t* APP_GITHUB_URL = L"https://github.com/YZH2653/ClipboardHistoryManager";
@@ -44,6 +44,7 @@ const wchar_t* RETENTION_LABELS[] = {L"3天", L"5天", L"7天", L"30天", L"永�
 const int RETENTION_COUNT = 5;
 int G_SelectedRetentionIndex = 0;  // 当前选中的保存时间索引
 bool G_DropdownOpen = false;  // 下拉菜单是否打开
+bool G_AutoStart = false;  // 开机自启状态
 
 // 界面状态
 wstring G_SearchText;       // 搜索文本
@@ -354,12 +355,13 @@ void DrawSettingsPage (HDC hdc)
     TextOut (hdc, 100, 12, L"设置", 2);
     DeleteObject (titleFont);
 
-    // 绘制分割线
+    // 创建分割线画笔（整个函数复用）
     HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
+
+    // 绘制分割线
     SelectObject (hdc, linePen);
     MoveToEx (hdc, 20, 55, NULL);
     LineTo (hdc, G_WindowWidth - 20, 55);
-    DeleteObject (linePen);
 
     // 保存时间设置
     SetTextColor (hdc, RGB (33, 33, 33));
@@ -381,10 +383,11 @@ void DrawSettingsPage (HDC hdc)
     FillRect (hdc, &bgRect, bgBrush);
     DeleteObject (bgBrush);
 
-    // 绘制边框
+    // 绘制边框（临时切换画笔，用完恢复）
     HPEN borderPen = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
-    SelectObject (hdc, borderPen);
+    HPEN prevPen = (HPEN)SelectObject (hdc, borderPen);
     Rectangle (hdc, dropdownX, dropdownY, dropdownX + dropdownWidth, dropdownY + dropdownHeight);
+    SelectObject (hdc, prevPen);
     DeleteObject (borderPen);
 
     // 绘制当前选中的值
@@ -400,13 +403,58 @@ void DrawSettingsPage (HDC hdc)
     DeleteObject (valueFont);
 
     // 绘制分割线
-    SelectObject (hdc, linePen);
     MoveToEx (hdc, 20, 140, NULL);
     LineTo (hdc, G_WindowWidth - 20, 140);
-    DeleteObject (linePen);
+
+    // 开机自启设置
+    SetTextColor (hdc, RGB (33, 33, 33));
+    HFONT autoStartFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, autoStartFont);
+    TextOut (hdc, 20, 158, L"开机自启", 4);
+
+    // 绘制开关按钮
+    int toggleWidth = 70;
+    int toggleHeight = 36;
+    int toggleX = G_WindowWidth - toggleWidth - 40;
+    int toggleY = 153;
+
+    // 开关背景色
+    COLORREF toggleBgColor = G_AutoStart ? RGB (74, 144, 217) : RGB (200, 200, 200);
+    HBRUSH toggleBgBrush = CreateSolidBrush (toggleBgColor);
+    RECT toggleRect = { toggleX, toggleY, toggleX + toggleWidth, toggleY + toggleHeight };
+    FillRect (hdc, &toggleRect, toggleBgBrush);
+    DeleteObject (toggleBgBrush);
+
+    // 绘制开关圆角边框（临时切换画笔和画刷，用完恢复）
+    HPEN togglePen = CreatePen (PS_SOLID, 1, toggleBgColor);
+    HBRUSH nullBrush = (HBRUSH)GetStockObject (NULL_BRUSH);
+    prevPen = (HPEN)SelectObject (hdc, togglePen);
+    HBRUSH prevBrush = (HBRUSH)SelectObject (hdc, nullBrush);
+    RoundRect (hdc, toggleX, toggleY, toggleX + toggleWidth, toggleY + toggleHeight, toggleHeight, toggleHeight);
+    SelectObject (hdc, prevBrush);
+    SelectObject (hdc, prevPen);
+    DeleteObject (togglePen);
+
+    // 绘制开关文字
+    SetBkMode (hdc, TRANSPARENT);
+    SetTextColor (hdc, RGB (255, 255, 255));
+    HFONT toggleFont = CreateFont (22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, toggleFont);
+    const wchar_t* toggleText = G_AutoStart ? L"开" : L"关";
+    SIZE toggleTextSize;
+    GetTextExtentPoint32 (hdc, toggleText, 1, &toggleTextSize);
+    int toggleTextX = toggleX + (toggleWidth - toggleTextSize.cx) / 2;
+    int toggleTextY = toggleY + (toggleHeight - toggleTextSize.cy) / 2;
+    TextOut (hdc, toggleTextX, toggleTextY, toggleText, 1);
+    DeleteObject (toggleFont);
+    DeleteObject (autoStartFont);
+
+    // 绘制分割线
+    MoveToEx (hdc, 20, 200, NULL);
+    LineTo (hdc, G_WindowWidth - 20, 200);
 
     // 版本信息入口
-    int versionY = 170;
+    int versionY = 220;
     HFONT versionFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, versionFont);
     SetTextColor (hdc, RGB (33, 33, 33));
@@ -417,13 +465,11 @@ void DrawSettingsPage (HDC hdc)
     TextOut (hdc, G_WindowWidth - 40, versionY, L"→", 1);
 
     // 绘制分割线
-    SelectObject (hdc, linePen);
     MoveToEx (hdc, 20, versionY + 40, NULL);
     LineTo (hdc, G_WindowWidth - 20, versionY + 40);
-    DeleteObject (linePen);
 
     // 问题反馈入口
-    int feedbackY = 230;
+    int feedbackY = 280;
     SetTextColor (hdc, RGB (33, 33, 33));
     TextOut (hdc, 20, feedbackY, L"问题反馈", 4);
 
@@ -433,10 +479,8 @@ void DrawSettingsPage (HDC hdc)
     DeleteObject (versionFont);
 
     // 绘制分割线
-    SelectObject (hdc, linePen);
     MoveToEx (hdc, 20, feedbackY + 40, NULL);
     LineTo (hdc, G_WindowWidth - 20, feedbackY + 40);
-    DeleteObject (linePen);
 
     // GitHub 仓库地址
     int githubY = G_WindowHeight - 60;
@@ -471,8 +515,9 @@ void DrawSettingsPage (HDC hdc)
 
             // 绘制边框
             HPEN optBorderPen = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
-            SelectObject (hdc, optBorderPen);
+            HPEN savedPen = (HPEN)SelectObject (hdc, optBorderPen);
             Rectangle (hdc, dropdownX, optionY, dropdownX + dropdownWidth, optionY + optionHeight);
+            SelectObject (hdc, savedPen);
             DeleteObject (optBorderPen);
 
             // 绘制文字（当前选中的加一个✓标记）
@@ -497,6 +542,9 @@ void DrawSettingsPage (HDC hdc)
             DeleteObject (optionFont);
         }
     }
+
+    // 清理分割线画笔
+    DeleteObject (linePen);
 }
 
 // 绘制版本号页面
@@ -1026,8 +1074,24 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
             }
 
+            // 检查是否点击了开机自启开关
+            int toggleWidth = 70;
+            int toggleHeight = 36;
+            int toggleX = G_WindowWidth - toggleWidth - 40;
+            int toggleY = 153;
+
+            if (x >= toggleX && x <= toggleX + toggleWidth && y >= toggleY && y <= toggleY + toggleHeight)
+            {
+                G_AutoStart = !G_AutoStart;
+                Storage::SetAutoStart (G_AutoStart);
+                G_Storage.SaveAutoStartSetting (G_AutoStart);
+                G_DropdownOpen = false;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+
             // 检查是否点击了版本信息入口
-            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 170 && y <= 210)
+            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 220 && y <= 260)
             {
                 G_CurrentPage = PAGE_VERSION;
                 G_DropdownOpen = false;
@@ -1036,7 +1100,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
 
             // 检查是否点击了问题反馈入口
-            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 230 && y <= 270)
+            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 280 && y <= 320)
             {
                 G_CurrentPage = PAGE_FEEDBACK;
                 G_DropdownOpen = false;
@@ -1198,6 +1262,19 @@ int main ()
             G_SelectedRetentionIndex = i;
             break;
         }
+    }
+
+    // 加载开机自启设置并同步注册表
+    G_Storage.LoadAutoStartSetting (G_AutoStart);
+    if (G_AutoStart)
+    {
+        // 确保注册表中有自启项
+        Storage::SetAutoStart (true);
+    }
+    else
+    {
+        // 确保注册表中无自启项
+        Storage::SetAutoStart (false);
     }
 
     // 删除过期记录

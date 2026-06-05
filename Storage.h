@@ -40,6 +40,18 @@ public:
     // 加载设置
     bool LoadSettings (int& retentionDays, int& maxRecords);
 
+    // 保存开机自启设置
+    bool SaveAutoStartSetting (bool enabled);
+
+    // 加载开机自启设置
+    bool LoadAutoStartSetting (bool& enabled);
+
+    // 设置开机自启（写入/删除注册表）
+    static bool SetAutoStart (bool enabled);
+
+    // 检查是否已设置开机自启
+    static bool IsAutoStartEnabled ();
+
 private:
     // 确保存储目录存在
     void EnsureDirectories ();
