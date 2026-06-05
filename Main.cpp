@@ -18,8 +18,8 @@ ClipboardManager G_ClipManager;
 Storage G_Storage;
 
 // 版本号
-const wchar_t* APP_VERSION = L"1.2.0.0";
-const wchar_t* APP_UPDATE_DATE = L"2026-06-03";
+const wchar_t* APP_VERSION = L"1.3.0.0";
+const wchar_t* APP_UPDATE_DATE = L"2026-06-05";
 const wchar_t* APP_AUTHOR = L"YZH2653";
 const wchar_t* APP_AUTHOR_EMAIL = L"yzh2653@163.com";
 const wchar_t* APP_GITHUB_URL = L"https://github.com/YZH2653/ClipboardHistoryManager";
@@ -1262,6 +1262,19 @@ int main ()
             G_SelectedRetentionIndex = i;
             break;
         }
+    }
+
+    // 加载开机自启设置并同步注册表
+    G_Storage.LoadAutoStartSetting (G_AutoStart);
+    if (G_AutoStart)
+    {
+        // 确保注册表中有自启项
+        Storage::SetAutoStart (true);
+    }
+    else
+    {
+        // 确保注册表中无自启项
+        Storage::SetAutoStart (false);
     }
 
     // 删除过期记录
