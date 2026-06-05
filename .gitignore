@@ -28,6 +28,9 @@ clips/
 # 便携版（单独管理）
 portable/
 
+# 弃用的JSON库
+json.hpp
+
 # 程序运行时生成的文件
 *.json
 !docs/*.json

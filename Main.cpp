@@ -18,8 +18,8 @@ ClipboardManager G_ClipManager;
 Storage G_Storage;
 
 // 版本号
-const wchar_t* APP_VERSION = L"1.1.0.0";
-const wchar_t* APP_UPDATE_DATE = L"2026-06-02";
+const wchar_t* APP_VERSION = L"1.2.0.0";
+const wchar_t* APP_UPDATE_DATE = L"2026-06-03";
 const wchar_t* APP_AUTHOR = L"YZH2653";
 const wchar_t* APP_AUTHOR_EMAIL = L"yzh2653@163.com";
 const wchar_t* APP_GITHUB_URL = L"https://github.com/YZH2653/ClipboardHistoryManager";

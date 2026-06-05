@@ -11,6 +11,7 @@
 - **删除功能**：不需要的记录可以手动删除
 - **快速复制**：点击卡片即可复制内容到剪贴板
 - **过期清理**：自动清理超过保留期限的记录
+- **截图去重**：10秒内相同图片只保存一次
 - **便携使用**：绿色软件，无需安装，可直接放在U盘使用
 
 ## 🚀 快速开始
@@ -18,19 +19,19 @@
 ### 编译运行
 
 ```bash
-# 编译程序
-g++ -std=c++17 -Wall -Wextra Main.cpp ClipboardManager.cpp Storage.cpp --output ClipboardHistory.exe -lgdiplus -lgdi32 -luser32
+# 编译程序（需要 MinGW-w64）
+g++ -std=c++17 -static -mwindows -o output/ClipboardHistory.exe Main.cpp ClipboardManager.cpp Storage.cpp sqlite3.c -lgdiplus -lgdi32 -luser32 -lole32
 
 # 运行程序
-./ClipboardHistory.exe
+./output/ClipboardHistory.exe
 ```
 
 ### 使用方法
 
 1. 启动程序后，它会自动监听剪贴板变化
 2. 复制任何文字或图片，程序会自动记录
-3. 点击托盘图标打开主界面
-4. 在界面中查看、搜索、管理历史记录
+3. 在界面中查看、搜索、管理历史记录
+4. 点击齿轮图标进入设置页面
 
 ## 🔍 搜索格式
 
@@ -45,24 +46,26 @@ g++ -std=c++17 -Wall -Wextra Main.cpp ClipboardManager.cpp Storage.cpp --output 
 ## 📁 项目结构
 
 ```
-ClipboardHistory/
-├── Main.cpp                 # 主程序（UI和逻辑）
-├── ClipboardManager.h/cpp   # 剪贴板管理
-├── Storage.h/cpp            # 存储管理
-├── json.hpp                 # JSON库
+ClipboardHistoryManager/
+├── Main.cpp                 # 主程序（入口、UI、消息循环）
+├── ClipboardManager.h/cpp   # 剪贴板监听和内容捕获
+├── Storage.h/cpp            # SQLite数据库存储管理
+├── sqlite3.h/c              # SQLite数据库引擎
 ├── clips/                   # 存储目录（运行时创建）
-│   ├── history.json         # 历史记录索引
+│   ├── history.db           # SQLite数据库文件
 │   └── images/              # 图片存储
 ├── docs/                    # 项目文档
-└── devlogs/                 # 开发日志
+├── versions/                # 版本开发目录
+├── devlogs/                 # 软件初始开发日志
+└── output/                  # 编译输出
 ```
 
 ## 🛠️ 技术栈
 
 - **语言**：C++17
 - **编译器**：MinGW-w64 (GCC)
-- **UI框架**：Win32原生API
-- **JSON库**：nlohmann/json
+- **UI框架**：Win32原生API（GDI绘制）
+- **数据库**：SQLite3（v3.45.0）
 - **图片处理**：GDI+
 
 ## 📋 系统要求
@@ -79,14 +82,17 @@ ClipboardHistory/
 
 ## ⚙️ 配置说明
 
-- **保留天数**：默认保留最近3天的记录
+- **保留天数**：默认保留最近3天的记录（可选3天/5天/7天/30天/永久）
 - **最大记录数**：默认最多保存1000条记录
 - **文字限制**：单条文字最多保存10000字符
 
 ## 📝 更新日志
 
 ### v1.2.0 (2026-06-03)
-- 🐛 解决了一些已知问题
+- 🐛 使用 SQLite 数据库替代 JSON 文件，解决数据丢失问题
+- 🐛 修复截图重复保存问题（图片哈希去重）
+- 🐛 修复图片保存失败问题
+- 🔧 移除调试输出，添加 `-mwindows` 编译参数
 
 ### v1.1.0 (2026-06-02)
 - ✨ 新增设置页面
