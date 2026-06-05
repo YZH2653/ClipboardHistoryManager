@@ -1,6 +1,7 @@
 # C++编译产物
 *.exe
 *.obj
+*.o
 *.pdb
 *.ilk
 *.out
