@@ -14,44 +14,44 @@
 
 ## 阶段2：实现系统托盘功能
 
-### 步骤2.1：添加托盘图标 ⬜
-- [ ] 在 Main.cpp 中定义 `WM_TRAYICON` 自定义消息
-- [ ] 定义 `NOTIFYICONDATA` 全局变量
-- [ ] 编写 `AddTrayIcon()` 函数：创建托盘图标
-- [ ] 编写 `RemoveTrayIcon()` 函数：删除托盘图标
-- [ ] 在 `main()` 中调用 `AddTrayIcon()`
-- [ ] 在 `WM_DESTROY` 中调用 `RemoveTrayIcon()`
-- [ ] 提交代码
+### 步骤2.1：添加托盘图标 ✅
+- [x] 在 Main.cpp 中定义 `WM_TRAYICON` 自定义消息
+- [x] 定义 `NOTIFYICONDATA` 全局变量
+- [x] 编写 `AddTrayIcon()` 函数：创建托盘图标
+- [x] 编写 `RemoveTrayIcon()` 函数：删除托盘图标
+- [x] 在 `main()` 中调用 `AddTrayIcon()`
+- [x] 在 `WM_DESTROY` 中调用 `RemoveTrayIcon()`
+- [x] 提交代码
 
-### 步骤2.2：实现最小化到托盘 ⬜
-- [ ] 在 `WM_SIZE` 中检测 `SIZE_MINIMIZED`
-- [ ] 最小化时调用 `ShowWindow(hWnd, SW_HIDE)` 隐藏窗口
-- [ ] 测试最小化行为
-- [ ] 提交代码
+### 步骤2.2：实现最小化到托盘 ✅
+- [x] 在 `WM_SIZE` 中检测 `SIZE_MINIMIZED`
+- [x] 最小化时调用 `ShowWindow(hWnd, SW_HIDE)` 隐藏窗口
+- [x] 测试最小化行为
+- [x] 提交代码
 
-### 步骤2.3：实现托盘右键菜单 ⬜
-- [ ] 在 `WindowProc` 中处理 `WM_TRAYICON` 消息
-- [ ] 处理 `WM_RBUTTONDOWN`：创建并显示弹出菜单
-- [ ] 实现"显示窗口"菜单项：恢复窗口
-- [ ] 实现"退出"菜单项：发送 `WM_CLOSE`
-- [ ] 提交代码
+### 步骤2.3：实现托盘右键菜单 ✅
+- [x] 在 `WindowProc` 中处理 `WM_TRAYICON` 消息
+- [x] 处理 `WM_RBUTTONDOWN`：创建并显示弹出菜单
+- [x] 实现"显示窗口"菜单项：恢复窗口
+- [x] 实现"退出"菜单项：发送 `WM_CLOSE`
+- [x] 提交代码
 
-### 步骤2.4：实现双击恢复 ⬜
-- [ ] 处理 `WM_LBUTTONDBLCLK`：双击托盘图标
-- [ ] 恢复窗口显示（`ShowWindow` + `SetForegroundWindow`）
-- [ ] 提交代码
+### 步骤2.4：实现双击恢复 ✅
+- [x] 处理 `WM_LBUTTONDBLCLK`：双击托盘图标
+- [x] 恢复窗口显示（`ShowWindow` + `SetForegroundWindow`）
+- [x] 提交代码
 
 ---
 
 ## 阶段3：自启最小化集成
 
-### 步骤3.1：自启时最小化到托盘 ⬜
-- [ ] 在 `main()` 中判断自启设置
-- [ ] 自启时使用 `ShowWindow(hWnd, SW_HIDE)` 启动
-- [ ] 自启时不在任务栏显示
-- [ ] 测试自启和手动启动的行为差异
-- [ ] 更新版本号到 1.4.0.0
-- [ ] 提交代码
+### 步骤3.1：自启时最小化到托盘 ✅
+- [x] 在 `main()` 中判断自启设置
+- [x] 自启时使用 `ShowWindow(hWnd, SW_HIDE)` 启动
+- [x] 自启时不在任务栏显示
+- [x] 测试自启和手动启动的行为差异
+- [x] 更新版本号到 1.4.0.0
+- [x] 提交代码
 
 ---
 
