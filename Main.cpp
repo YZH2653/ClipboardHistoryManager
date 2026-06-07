@@ -3,12 +3,16 @@
 #define WINVER 0x0601
 #define _WIN32_WINNT 0x0601
 #include <windows.h>
+#include <shellapi.h>
 #include <iostream>
 #include <fstream>
 #include <algorithm>
 #include "ClipboardManager.h"
 #include "Storage.h"
 using namespace std;
+
+// 自定义消息：托盘图标
+#define WM_TRAYICON (WM_USER + 1)
 
 // 窗口类名
 const wchar_t* CLASS_NAME = L"ClipboardHistoryClass";
@@ -18,8 +22,8 @@ ClipboardManager G_ClipManager;
 Storage G_Storage;
 
 // 版本号
-const wchar_t* APP_VERSION = L"1.3.0.0";
-const wchar_t* APP_UPDATE_DATE = L"2026-06-05";
+const wchar_t* APP_VERSION = L"1.4.0.0";
+const wchar_t* APP_UPDATE_DATE = L"2026-06-07";
 const wchar_t* APP_AUTHOR = L"YZH2653";
 const wchar_t* APP_AUTHOR_EMAIL = L"yzh2653@163.com";
 const wchar_t* APP_GITHUB_URL = L"https://github.com/YZH2653/ClipboardHistoryManager";
@@ -57,6 +61,11 @@ int G_CursorPos = 0;        // 光标位置
 int G_WindowWidth = 800;
 int G_WindowHeight = 600;
 
+// 托盘图标
+NOTIFYICONDATA G_Nid = {};
+bool G_TrayIconAdded = false;
+bool G_IsMinimizedToTray = false;
+
 // 获取exe所在目录
 wstring GetExeDir ()
 {
@@ -69,6 +78,51 @@ wstring GetExeDir ()
         return fullPath.substr (0, pos);
     }
     return fullPath;
+}
+
+// 添加托盘图标
+void AddTrayIcon (HWND hWnd)
+{
+    G_Nid.cbSize = sizeof (NOTIFYICONDATA);
+    G_Nid.hWnd = hWnd;
+    G_Nid.uID = 1;
+    G_Nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    G_Nid.uCallbackMessage = WM_TRAYICON;
+    G_Nid.hIcon = LoadIcon (GetModuleHandle (NULL), MAKEINTRESOURCE (1));
+    if (G_Nid.hIcon == NULL)
+    {
+        // 如果没有资源图标，使用默认图标
+        G_Nid.hIcon = LoadIcon (NULL, IDI_APPLICATION);
+    }
+    wcscpy_s (G_Nid.szTip, L"历史剪贴板管理器");
+    Shell_NotifyIcon (NIM_ADD, &G_Nid);
+    G_TrayIconAdded = true;
+}
+
+// 删除托盘图标
+void RemoveTrayIcon ()
+{
+    if (G_TrayIconAdded)
+    {
+        Shell_NotifyIcon (NIM_DELETE, &G_Nid);
+        G_TrayIconAdded = false;
+    }
+}
+
+// 最小化到托盘
+void MinimizeToTray (HWND hWnd)
+{
+    ShowWindow (hWnd, SW_HIDE);
+    G_IsMinimizedToTray = true;
+}
+
+// 从托盘恢复窗口
+void RestoreFromTray (HWND hWnd)
+{
+    ShowWindow (hWnd, SW_SHOW);
+    SetForegroundWindow (hWnd);
+    G_IsMinimizedToTray = false;
+    InvalidateRect (hWnd, NULL, TRUE);
 }
 
 // 获取筛选后的记录（置顶优先，时间倒序）
@@ -741,6 +795,41 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
+    case WM_TRAYICON:
+    {
+        if (lParam == WM_LBUTTONDBLCLK)
+        {
+            // 双击托盘图标恢复窗口
+            RestoreFromTray (hWnd);
+        }
+        else if (lParam == WM_RBUTTONDOWN)
+        {
+            // 右键托盘图标显示菜单
+            POINT pt;
+            GetCursorPos (&pt);
+
+            HMENU hMenu = CreatePopupMenu ();
+            AppendMenu (hMenu, MF_STRING, 1, L"显示窗口");
+            AppendMenu (hMenu, MF_SEPARATOR, 0, NULL);
+            AppendMenu (hMenu, MF_STRING, 2, L"退出");
+
+            SetForegroundWindow (hWnd);
+            int cmd = TrackPopupMenu (hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hWnd, NULL);
+            DestroyMenu (hMenu);
+
+            if (cmd == 1)
+            {
+                RestoreFromTray (hWnd);
+            }
+            else if (cmd == 2)
+            {
+                RemoveTrayIcon ();
+                PostQuitMessage (0);
+            }
+        }
+        return 0;
+    }
+
     case WM_GETMINMAXINFO:
     {
         // 设置窗口最小尺寸
@@ -752,6 +841,13 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_SIZE:
     {
+        if (wParam == SIZE_MINIMIZED)
+        {
+            // 最小化时隐藏到托盘
+            MinimizeToTray (hWnd);
+            return 0;
+        }
+
         // 窗口大小改变时更新尺寸
         G_WindowWidth = LOWORD (lParam);
         G_WindowHeight = HIWORD (lParam);
@@ -765,6 +861,9 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         // 清理GDI+
         G_ClipManager.ShutdownGdiplus ();
+
+        // 删除托盘图标
+        RemoveTrayIcon ();
 
         // 保存记录到文件
         G_Storage.SaveRecords (G_ClipManager.GetRecords ());
@@ -1319,9 +1418,21 @@ int main ()
     // 初始化GDI+
     G_ClipManager.InitializeGdiplus ();
 
-    // 显示窗口
-    ShowWindow (hWnd, SW_SHOW);
-    UpdateWindow (hWnd);
+    // 添加托盘图标
+    AddTrayIcon (hWnd);
+
+    // 判断是否开机自启，决定启动方式
+    if (G_AutoStart)
+    {
+        // 开机自启时最小化到托盘
+        MinimizeToTray (hWnd);
+    }
+    else
+    {
+        // 正常启动显示窗口
+        ShowWindow (hWnd, SW_SHOW);
+        UpdateWindow (hWnd);
+    }
 
     // 消息循环
     MSG msg = {};
