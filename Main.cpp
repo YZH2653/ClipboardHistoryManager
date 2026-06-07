@@ -49,6 +49,7 @@ const int RETENTION_COUNT = 5;
 int G_SelectedRetentionIndex = 0;  // 当前选中的保存时间索引
 bool G_DropdownOpen = false;  // 下拉菜单是否打开
 bool G_AutoStart = false;  // 开机自启状态
+bool G_MinimizeToTray = true;  // 关闭时最小化到托盘
 
 // 界面状态
 wstring G_SearchText;       // 搜索文本
@@ -507,8 +508,54 @@ void DrawSettingsPage (HDC hdc)
     MoveToEx (hdc, 20, 200, NULL);
     LineTo (hdc, G_WindowWidth - 20, 200);
 
+    // 关闭时最小化到托盘设置
+    SetTextColor (hdc, RGB (33, 33, 33));
+    HFONT minimizeFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, minimizeFont);
+    TextOut (hdc, 20, 218, L"关闭时最小化到托盘", 9);
+
+    // 绘制开关按钮
+    int minimizeToggleWidth = 70;
+    int minimizeToggleHeight = 36;
+    int minimizeToggleX = G_WindowWidth - minimizeToggleWidth - 40;
+    int minimizeToggleY = 213;
+
+    // 开关背景色
+    COLORREF minimizeToggleBgColor = G_MinimizeToTray ? RGB (74, 144, 217) : RGB (200, 200, 200);
+    HBRUSH minimizeToggleBgBrush = CreateSolidBrush (minimizeToggleBgColor);
+    RECT minimizeToggleRect = { minimizeToggleX, minimizeToggleY, minimizeToggleX + minimizeToggleWidth, minimizeToggleY + minimizeToggleHeight };
+    FillRect (hdc, &minimizeToggleRect, minimizeToggleBgBrush);
+    DeleteObject (minimizeToggleBgBrush);
+
+    // 绘制开关圆角边框
+    HPEN minimizeTogglePen = CreatePen (PS_SOLID, 1, minimizeToggleBgColor);
+    HPEN prevPen2 = (HPEN)SelectObject (hdc, minimizeTogglePen);
+    HBRUSH prevBrush2 = (HBRUSH)SelectObject (hdc, nullBrush);
+    RoundRect (hdc, minimizeToggleX, minimizeToggleY, minimizeToggleX + minimizeToggleWidth, minimizeToggleY + minimizeToggleHeight, minimizeToggleHeight, minimizeToggleHeight);
+    SelectObject (hdc, prevBrush2);
+    SelectObject (hdc, prevPen2);
+    DeleteObject (minimizeTogglePen);
+
+    // 绘制开关文字
+    SetBkMode (hdc, TRANSPARENT);
+    SetTextColor (hdc, RGB (255, 255, 255));
+    HFONT minimizeToggleFont = CreateFont (22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, minimizeToggleFont);
+    const wchar_t* minimizeToggleText = G_MinimizeToTray ? L"开" : L"关";
+    SIZE minimizeToggleTextSize;
+    GetTextExtentPoint32 (hdc, minimizeToggleText, 1, &minimizeToggleTextSize);
+    int minimizeToggleTextX = minimizeToggleX + (minimizeToggleWidth - minimizeToggleTextSize.cx) / 2;
+    int minimizeToggleTextY = minimizeToggleY + (minimizeToggleHeight - minimizeToggleTextSize.cy) / 2;
+    TextOut (hdc, minimizeToggleTextX, minimizeToggleTextY, minimizeToggleText, 1);
+    DeleteObject (minimizeToggleFont);
+    DeleteObject (minimizeFont);
+
+    // 绘制分割线
+    MoveToEx (hdc, 20, 260, NULL);
+    LineTo (hdc, G_WindowWidth - 20, 260);
+
     // 版本信息入口
-    int versionY = 220;
+    int versionY = 280;
     HFONT versionFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, versionFont);
     SetTextColor (hdc, RGB (33, 33, 33));
@@ -523,7 +570,7 @@ void DrawSettingsPage (HDC hdc)
     LineTo (hdc, G_WindowWidth - 20, versionY + 40);
 
     // 问题反馈入口
-    int feedbackY = 280;
+    int feedbackY = 340;
     SetTextColor (hdc, RGB (33, 33, 33));
     TextOut (hdc, 20, feedbackY, L"问题反馈", 4);
 
@@ -852,6 +899,19 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         G_WindowWidth = LOWORD (lParam);
         G_WindowHeight = HIWORD (lParam);
         InvalidateRect (hWnd, NULL, TRUE);
+        return 0;
+    }
+
+    case WM_CLOSE:
+    {
+        // 关闭时最小化到托盘（而不是退出）
+        if (G_MinimizeToTray)
+        {
+            MinimizeToTray (hWnd);
+            return 0;
+        }
+        // 如果未开启最小化到托盘，正常关闭
+        DestroyWindow (hWnd);
         return 0;
     }
 
@@ -1189,8 +1249,23 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 return 0;
             }
 
+            // 检查是否点击了关闭时最小化到托盘开关
+            int minimizeToggleWidth = 70;
+            int minimizeToggleHeight = 36;
+            int minimizeToggleX = G_WindowWidth - minimizeToggleWidth - 40;
+            int minimizeToggleY = 213;
+
+            if (x >= minimizeToggleX && x <= minimizeToggleX + minimizeToggleWidth && y >= minimizeToggleY && y <= minimizeToggleY + minimizeToggleHeight)
+            {
+                G_MinimizeToTray = !G_MinimizeToTray;
+                G_Storage.SaveMinimizeToTraySetting (G_MinimizeToTray);
+                G_DropdownOpen = false;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+
             // 检查是否点击了版本信息入口
-            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 220 && y <= 260)
+            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 280 && y <= 320)
             {
                 G_CurrentPage = PAGE_VERSION;
                 G_DropdownOpen = false;
@@ -1199,7 +1274,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
 
             // 检查是否点击了问题反馈入口
-            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 280 && y <= 320)
+            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 340 && y <= 380)
             {
                 G_CurrentPage = PAGE_FEEDBACK;
                 G_DropdownOpen = false;
@@ -1420,6 +1495,9 @@ int main ()
 
     // 添加托盘图标
     AddTrayIcon (hWnd);
+
+    // 加载最小化到托盘设置
+    G_Storage.LoadMinimizeToTraySetting (G_MinimizeToTray);
 
     // 判断是否开机自启，决定启动方式
     if (G_AutoStart)
