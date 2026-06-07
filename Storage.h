@@ -46,6 +46,12 @@ public:
     // 加载开机自启设置
     bool LoadAutoStartSetting (bool& enabled);
 
+    // 保存关闭时最小化到托盘设置
+    bool SaveMinimizeToTraySetting (bool enabled);
+
+    // 加载关闭时最小化到托盘设置
+    bool LoadMinimizeToTraySetting (bool& enabled);
+
     // 设置开机自启（写入/删除注册表）
     static bool SetAutoStart (bool enabled);
 

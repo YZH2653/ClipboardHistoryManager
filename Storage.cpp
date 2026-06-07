@@ -363,6 +363,56 @@ bool Storage::LoadAutoStartSetting (bool& enabled)
     return true;
 }
 
+// 保存关闭时最小化到托盘设置
+bool Storage::SaveMinimizeToTraySetting (bool enabled)
+{
+    if (!g_db) return false;
+
+    const char* upsertSQL = "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?);";
+    sqlite3_stmt* stmt = NULL;
+
+    int rc = sqlite3_prepare_v2 (g_db, upsertSQL, -1, &stmt, NULL);
+    if (rc) return false;
+
+    sqlite3_reset (stmt);
+    sqlite3_clear_bindings (stmt);
+    sqlite3_bind_text (stmt, 1, "minimizeToTray", -1, SQLITE_STATIC);
+    sqlite3_bind_int (stmt, 2, enabled ? 1 : 0);
+    sqlite3_step (stmt);
+
+    sqlite3_finalize (stmt);
+    return true;
+}
+
+// 加载关闭时最小化到托盘设置
+bool Storage::LoadMinimizeToTraySetting (bool& enabled)
+{
+    if (!g_db)
+    {
+        enabled = true;
+        return true;
+    }
+
+    const char* selectSQL = "SELECT value FROM settings WHERE key = 'minimizeToTray';";
+    sqlite3_stmt* stmt = NULL;
+
+    int rc = sqlite3_prepare_v2 (g_db, selectSQL, -1, &stmt, NULL);
+    if (rc)
+    {
+        enabled = true;
+        return true;
+    }
+
+    enabled = true;
+    if (sqlite3_step (stmt) == SQLITE_ROW)
+    {
+        enabled = (sqlite3_column_int (stmt, 0) == 1);
+    }
+
+    sqlite3_finalize (stmt);
+    return true;
+}
+
 // 设置开机自启（写入/删除注册表）
 bool Storage::SetAutoStart (bool enabled)
 {
@@ -377,13 +427,14 @@ bool Storage::SetAutoStart (bool enabled)
 
     if (enabled)
     {
-        // 获取exe绝对路径
+        // 获取exe绝对路径并添加 --minimized 参数
         wchar_t exePath[MAX_PATH];
         GetModuleFileNameW (NULL, exePath, MAX_PATH);
+        wstring cmdLine = wstring (exePath) + L" --minimized";
 
         // 写入注册表
         result = RegSetValueExW (hKey, L"ClipboardHistoryManager", 0, REG_SZ,
-            (const BYTE*)exePath, (DWORD)(wcslen (exePath) + 1) * sizeof (wchar_t));
+            (const BYTE*)cmdLine.c_str (), (DWORD)(cmdLine.length () + 1) * sizeof (wchar_t));
     }
     else
     {

@@ -3,12 +3,16 @@
 #define WINVER 0x0601
 #define _WIN32_WINNT 0x0601
 #include <windows.h>
+#include <shellapi.h>
 #include <iostream>
 #include <fstream>
 #include <algorithm>
 #include "ClipboardManager.h"
 #include "Storage.h"
 using namespace std;
+
+// 自定义消息：托盘图标
+#define WM_TRAYICON (WM_USER + 1)
 
 // 窗口类名
 const wchar_t* CLASS_NAME = L"ClipboardHistoryClass";
@@ -18,8 +22,8 @@ ClipboardManager G_ClipManager;
 Storage G_Storage;
 
 // 版本号
-const wchar_t* APP_VERSION = L"1.3.0.0";
-const wchar_t* APP_UPDATE_DATE = L"2026-06-05";
+const wchar_t* APP_VERSION = L"1.4.0.0";
+const wchar_t* APP_UPDATE_DATE = L"2026-06-07";
 const wchar_t* APP_AUTHOR = L"YZH2653";
 const wchar_t* APP_AUTHOR_EMAIL = L"yzh2653@163.com";
 const wchar_t* APP_GITHUB_URL = L"https://github.com/YZH2653/ClipboardHistoryManager";
@@ -45,6 +49,7 @@ const int RETENTION_COUNT = 5;
 int G_SelectedRetentionIndex = 0;  // 当前选中的保存时间索引
 bool G_DropdownOpen = false;  // 下拉菜单是否打开
 bool G_AutoStart = false;  // 开机自启状态
+bool G_MinimizeToTray = true;  // 关闭时最小化到托盘
 
 // 界面状态
 wstring G_SearchText;       // 搜索文本
@@ -56,6 +61,11 @@ int G_CursorPos = 0;        // 光标位置
 // 窗口尺寸
 int G_WindowWidth = 800;
 int G_WindowHeight = 600;
+
+// 托盘图标
+NOTIFYICONDATA G_Nid = {};
+bool G_TrayIconAdded = false;
+bool G_IsMinimizedToTray = false;
 
 // 获取exe所在目录
 wstring GetExeDir ()
@@ -69,6 +79,51 @@ wstring GetExeDir ()
         return fullPath.substr (0, pos);
     }
     return fullPath;
+}
+
+// 添加托盘图标
+void AddTrayIcon (HWND hWnd)
+{
+    G_Nid.cbSize = sizeof (NOTIFYICONDATA);
+    G_Nid.hWnd = hWnd;
+    G_Nid.uID = 1;
+    G_Nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    G_Nid.uCallbackMessage = WM_TRAYICON;
+    G_Nid.hIcon = LoadIcon (GetModuleHandle (NULL), MAKEINTRESOURCE (1));
+    if (G_Nid.hIcon == NULL)
+    {
+        // 如果没有资源图标，使用默认图标
+        G_Nid.hIcon = LoadIcon (NULL, IDI_APPLICATION);
+    }
+    wcscpy_s (G_Nid.szTip, L"历史剪贴板管理器");
+    Shell_NotifyIcon (NIM_ADD, &G_Nid);
+    G_TrayIconAdded = true;
+}
+
+// 删除托盘图标
+void RemoveTrayIcon ()
+{
+    if (G_TrayIconAdded)
+    {
+        Shell_NotifyIcon (NIM_DELETE, &G_Nid);
+        G_TrayIconAdded = false;
+    }
+}
+
+// 最小化到托盘
+void MinimizeToTray (HWND hWnd)
+{
+    ShowWindow (hWnd, SW_HIDE);
+    G_IsMinimizedToTray = true;
+}
+
+// 从托盘恢复窗口
+void RestoreFromTray (HWND hWnd)
+{
+    ShowWindow (hWnd, SW_SHOW);
+    SetForegroundWindow (hWnd);
+    G_IsMinimizedToTray = false;
+    InvalidateRect (hWnd, NULL, TRUE);
 }
 
 // 获取筛选后的记录（置顶优先，时间倒序）
@@ -453,8 +508,54 @@ void DrawSettingsPage (HDC hdc)
     MoveToEx (hdc, 20, 200, NULL);
     LineTo (hdc, G_WindowWidth - 20, 200);
 
+    // 关闭时最小化到托盘设置
+    SetTextColor (hdc, RGB (33, 33, 33));
+    HFONT minimizeFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, minimizeFont);
+    TextOut (hdc, 20, 218, L"关闭时最小化到托盘", 9);
+
+    // 绘制开关按钮
+    int minimizeToggleWidth = 70;
+    int minimizeToggleHeight = 36;
+    int minimizeToggleX = G_WindowWidth - minimizeToggleWidth - 40;
+    int minimizeToggleY = 213;
+
+    // 开关背景色
+    COLORREF minimizeToggleBgColor = G_MinimizeToTray ? RGB (74, 144, 217) : RGB (200, 200, 200);
+    HBRUSH minimizeToggleBgBrush = CreateSolidBrush (minimizeToggleBgColor);
+    RECT minimizeToggleRect = { minimizeToggleX, minimizeToggleY, minimizeToggleX + minimizeToggleWidth, minimizeToggleY + minimizeToggleHeight };
+    FillRect (hdc, &minimizeToggleRect, minimizeToggleBgBrush);
+    DeleteObject (minimizeToggleBgBrush);
+
+    // 绘制开关圆角边框
+    HPEN minimizeTogglePen = CreatePen (PS_SOLID, 1, minimizeToggleBgColor);
+    HPEN prevPen2 = (HPEN)SelectObject (hdc, minimizeTogglePen);
+    HBRUSH prevBrush2 = (HBRUSH)SelectObject (hdc, nullBrush);
+    RoundRect (hdc, minimizeToggleX, minimizeToggleY, minimizeToggleX + minimizeToggleWidth, minimizeToggleY + minimizeToggleHeight, minimizeToggleHeight, minimizeToggleHeight);
+    SelectObject (hdc, prevBrush2);
+    SelectObject (hdc, prevPen2);
+    DeleteObject (minimizeTogglePen);
+
+    // 绘制开关文字
+    SetBkMode (hdc, TRANSPARENT);
+    SetTextColor (hdc, RGB (255, 255, 255));
+    HFONT minimizeToggleFont = CreateFont (22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    SelectObject (hdc, minimizeToggleFont);
+    const wchar_t* minimizeToggleText = G_MinimizeToTray ? L"开" : L"关";
+    SIZE minimizeToggleTextSize;
+    GetTextExtentPoint32 (hdc, minimizeToggleText, 1, &minimizeToggleTextSize);
+    int minimizeToggleTextX = minimizeToggleX + (minimizeToggleWidth - minimizeToggleTextSize.cx) / 2;
+    int minimizeToggleTextY = minimizeToggleY + (minimizeToggleHeight - minimizeToggleTextSize.cy) / 2;
+    TextOut (hdc, minimizeToggleTextX, minimizeToggleTextY, minimizeToggleText, 1);
+    DeleteObject (minimizeToggleFont);
+    DeleteObject (minimizeFont);
+
+    // 绘制分割线
+    MoveToEx (hdc, 20, 260, NULL);
+    LineTo (hdc, G_WindowWidth - 20, 260);
+
     // 版本信息入口
-    int versionY = 220;
+    int versionY = 280;
     HFONT versionFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
     SelectObject (hdc, versionFont);
     SetTextColor (hdc, RGB (33, 33, 33));
@@ -469,7 +570,7 @@ void DrawSettingsPage (HDC hdc)
     LineTo (hdc, G_WindowWidth - 20, versionY + 40);
 
     // 问题反馈入口
-    int feedbackY = 280;
+    int feedbackY = 340;
     SetTextColor (hdc, RGB (33, 33, 33));
     TextOut (hdc, 20, feedbackY, L"问题反馈", 4);
 
@@ -741,6 +842,41 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
+    case WM_TRAYICON:
+    {
+        if (lParam == WM_LBUTTONDBLCLK)
+        {
+            // 双击托盘图标恢复窗口
+            RestoreFromTray (hWnd);
+        }
+        else if (lParam == WM_RBUTTONDOWN)
+        {
+            // 右键托盘图标显示菜单
+            POINT pt;
+            GetCursorPos (&pt);
+
+            HMENU hMenu = CreatePopupMenu ();
+            AppendMenu (hMenu, MF_STRING, 1, L"显示窗口");
+            AppendMenu (hMenu, MF_SEPARATOR, 0, NULL);
+            AppendMenu (hMenu, MF_STRING, 2, L"退出");
+
+            SetForegroundWindow (hWnd);
+            int cmd = TrackPopupMenu (hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hWnd, NULL);
+            DestroyMenu (hMenu);
+
+            if (cmd == 1)
+            {
+                RestoreFromTray (hWnd);
+            }
+            else if (cmd == 2)
+            {
+                RemoveTrayIcon ();
+                PostQuitMessage (0);
+            }
+        }
+        return 0;
+    }
+
     case WM_GETMINMAXINFO:
     {
         // 设置窗口最小尺寸
@@ -752,10 +888,30 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_SIZE:
     {
+        if (wParam == SIZE_MINIMIZED)
+        {
+            // 最小化时隐藏到托盘
+            MinimizeToTray (hWnd);
+            return 0;
+        }
+
         // 窗口大小改变时更新尺寸
         G_WindowWidth = LOWORD (lParam);
         G_WindowHeight = HIWORD (lParam);
         InvalidateRect (hWnd, NULL, TRUE);
+        return 0;
+    }
+
+    case WM_CLOSE:
+    {
+        // 关闭时最小化到托盘（而不是退出）
+        if (G_MinimizeToTray)
+        {
+            MinimizeToTray (hWnd);
+            return 0;
+        }
+        // 如果未开启最小化到托盘，正常关闭
+        DestroyWindow (hWnd);
         return 0;
     }
 
@@ -765,6 +921,9 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         // 清理GDI+
         G_ClipManager.ShutdownGdiplus ();
+
+        // 删除托盘图标
+        RemoveTrayIcon ();
 
         // 保存记录到文件
         G_Storage.SaveRecords (G_ClipManager.GetRecords ());
@@ -1090,8 +1249,23 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 return 0;
             }
 
+            // 检查是否点击了关闭时最小化到托盘开关
+            int minimizeToggleWidth = 70;
+            int minimizeToggleHeight = 36;
+            int minimizeToggleX = G_WindowWidth - minimizeToggleWidth - 40;
+            int minimizeToggleY = 213;
+
+            if (x >= minimizeToggleX && x <= minimizeToggleX + minimizeToggleWidth && y >= minimizeToggleY && y <= minimizeToggleY + minimizeToggleHeight)
+            {
+                G_MinimizeToTray = !G_MinimizeToTray;
+                G_Storage.SaveMinimizeToTraySetting (G_MinimizeToTray);
+                G_DropdownOpen = false;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+
             // 检查是否点击了版本信息入口
-            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 220 && y <= 260)
+            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 280 && y <= 320)
             {
                 G_CurrentPage = PAGE_VERSION;
                 G_DropdownOpen = false;
@@ -1100,7 +1274,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
 
             // 检查是否点击了问题反馈入口
-            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 280 && y <= 320)
+            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 340 && y <= 380)
             {
                 G_CurrentPage = PAGE_FEEDBACK;
                 G_DropdownOpen = false;
@@ -1229,8 +1403,19 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 }
 
 // 主函数
-int main ()
+int main (int argc, char* argv[])
 {
+    // 检查是否有 --minimized 参数（开机自启时使用）
+    bool startMinimized = false;
+    for (int i = 1; i < argc; i++)
+    {
+        if (string (argv[i]) == "--minimized")
+        {
+            startMinimized = true;
+            break;
+        }
+    }
+
     // 获取exe所在目录并切换到该目录
     wstring exeDir = GetExeDir ();
     SetCurrentDirectoryW (exeDir.c_str ());
@@ -1319,9 +1504,24 @@ int main ()
     // 初始化GDI+
     G_ClipManager.InitializeGdiplus ();
 
-    // 显示窗口
-    ShowWindow (hWnd, SW_SHOW);
-    UpdateWindow (hWnd);
+    // 添加托盘图标
+    AddTrayIcon (hWnd);
+
+    // 加载最小化到托盘设置
+    G_Storage.LoadMinimizeToTraySetting (G_MinimizeToTray);
+
+    // 根据启动方式决定是否显示窗口
+    if (startMinimized)
+    {
+        // 开机自启时最小化到托盘
+        MinimizeToTray (hWnd);
+    }
+    else
+    {
+        // 正常启动显示窗口
+        ShowWindow (hWnd, SW_SHOW);
+        UpdateWindow (hWnd);
+    }
 
     // 消息循环
     MSG msg = {};
