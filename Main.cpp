@@ -1403,8 +1403,19 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 }
 
 // 主函数
-int main ()
+int main (int argc, char* argv[])
 {
+    // 检查是否有 --minimized 参数（开机自启时使用）
+    bool startMinimized = false;
+    for (int i = 1; i < argc; i++)
+    {
+        if (string (argv[i]) == "--minimized")
+        {
+            startMinimized = true;
+            break;
+        }
+    }
+
     // 获取exe所在目录并切换到该目录
     wstring exeDir = GetExeDir ();
     SetCurrentDirectoryW (exeDir.c_str ());
@@ -1499,8 +1510,8 @@ int main ()
     // 加载最小化到托盘设置
     G_Storage.LoadMinimizeToTraySetting (G_MinimizeToTray);
 
-    // 判断是否开机自启，决定启动方式
-    if (G_AutoStart)
+    // 根据启动方式决定是否显示窗口
+    if (startMinimized)
     {
         // 开机自启时最小化到托盘
         MinimizeToTray (hWnd);

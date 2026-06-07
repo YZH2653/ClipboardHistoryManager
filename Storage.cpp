@@ -427,13 +427,14 @@ bool Storage::SetAutoStart (bool enabled)
 
     if (enabled)
     {
-        // 获取exe绝对路径
+        // 获取exe绝对路径并添加 --minimized 参数
         wchar_t exePath[MAX_PATH];
         GetModuleFileNameW (NULL, exePath, MAX_PATH);
+        wstring cmdLine = wstring (exePath) + L" --minimized";
 
         // 写入注册表
         result = RegSetValueExW (hKey, L"ClipboardHistoryManager", 0, REG_SZ,
-            (const BYTE*)exePath, (DWORD)(wcslen (exePath) + 1) * sizeof (wchar_t));
+            (const BYTE*)cmdLine.c_str (), (DWORD)(cmdLine.length () + 1) * sizeof (wchar_t));
     }
     else
     {
