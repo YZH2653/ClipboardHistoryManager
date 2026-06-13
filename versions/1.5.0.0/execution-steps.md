@@ -2,14 +2,14 @@
 
 ## 阶段1：基础准备
 
-### 步骤1.1：创建分支
-- [ ] 从 main 分支创建 `1.5.0.0` 分支
-- [ ] 切换到新分支
+### 步骤1.1：创建分支 ✅
+- [x] 从 main 分支创建 `1.5.0.0` 分支
+- [x] 切换到新分支
 
-### 步骤1.2：创建版本文档
-- [ ] 创建 versions/1.5.0.0/ 目录结构
-- [ ] 编写 README.md、requirements.md、execution-steps.md、changelog.md
-- [ ] 创建 devlogs 目录
+### 步骤1.2：创建版本文档 ✅
+- [x] 创建 versions/1.5.0.0/ 目录结构
+- [x] 编写 README.md、requirements.md、execution-steps.md、changelog.md
+- [x] 创建 devlogs 目录
 
 ---
 
