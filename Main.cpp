@@ -22,8 +22,8 @@ ClipboardManager G_ClipManager;
 Storage G_Storage;
 
 // 版本号
-const wchar_t* APP_VERSION = L"1.4.0.0";
-const wchar_t* APP_UPDATE_DATE = L"2026-06-07";
+const wchar_t* APP_VERSION = L"1.5.0.0";
+const wchar_t* APP_UPDATE_DATE = L"2026-06-13";
 const wchar_t* APP_AUTHOR = L"YZH2653";
 const wchar_t* APP_AUTHOR_EMAIL = L"yzh2653@163.com";
 const wchar_t* APP_GITHUB_URL = L"https://github.com/YZH2653/ClipboardHistoryManager";
@@ -57,6 +57,11 @@ int G_ScrollOffset = 0;     // 滚动偏移量
 int G_HoverIndex = -1;      // 鼠标悬停的卡片索引
 bool G_SearchFocused = false;  // 搜索框是否获得焦点
 int G_CursorPos = 0;        // 光标位置
+
+// 批量选择状态
+bool G_SelectMode = false;  // 是否进入选择模式
+bool G_SelectAll = false;   // 全选状态
+vector<int> G_SelectedItems;  // 选中的记录ID列表
 
 // 窗口尺寸
 int G_WindowWidth = 800;
@@ -771,32 +776,81 @@ void DrawFeedbackPage (HDC hdc)
     DeleteObject (contentFont);
 }
 
+// 绘制复选框
+void DrawCheckbox (HDC hdc, int x, int y, int size, bool checked, bool hovered)
+{
+    // 绘制复选框背景
+    COLORREF bgColor = hovered ? RGB (240, 240, 240) : RGB (255, 255, 255);
+    HBRUSH bgBrush = CreateSolidBrush (bgColor);
+    RECT bgRect = { x, y, x + size, y + size };
+    FillRect (hdc, &bgRect, bgBrush);
+    DeleteObject (bgBrush);
+
+    // 绘制边框
+    COLORREF borderColor = checked ? RGB (100, 149, 237) : RGB (180, 180, 180);
+    HPEN borderPen = CreatePen (PS_SOLID, 2, borderColor);
+    SelectObject (hdc, borderPen);
+    Rectangle (hdc, x, y, x + size, y + size);
+    DeleteObject (borderPen);
+
+    // 如果选中，绘制勾选标记
+    if (checked)
+    {
+        HPEN checkPen = CreatePen (PS_SOLID, 2, RGB (100, 149, 237));
+        SelectObject (hdc, checkPen);
+
+        // 绘制勾选标记
+        int startX = x + 4;
+        int startY = y + size / 2;
+        int midX = x + size / 3;
+        int midY = y + size - 4;
+        int endX = x + size - 4;
+        int endY = y + 4;
+
+        MoveToEx (hdc, startX, startY, NULL);
+        LineTo (hdc, midX, midY);
+        LineTo (hdc, endX, endY);
+
+        DeleteObject (checkPen);
+    }
+}
+
 // 绘制卡片
-void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool isHovered)
+void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool isHovered, bool isSelected = false)
 {
     // 绘制卡片背景
-    COLORREF bgColor = isHovered ? RGB (245, 248, 255) : RGB (255, 255, 255);
+    COLORREF bgColor = isSelected ? RGB (230, 240, 255) : (isHovered ? RGB (245, 248, 255) : RGB (255, 255, 255));
     HBRUSH cardBg = CreateSolidBrush (bgColor);
     RECT cardRect = { x, y, x + width, y + 100 };
     FillRect (hdc, &cardRect, cardBg);
     DeleteObject (cardBg);
 
     // 绘制边框
-    COLORREF borderColor = isHovered ? RGB (100, 149, 237) : RGB (220, 220, 220);
+    COLORREF borderColor = isSelected ? RGB (100, 149, 237) : (isHovered ? RGB (100, 149, 237) : RGB (220, 220, 220));
     HPEN borderPen = CreatePen (PS_SOLID, 1, borderColor);
     SelectObject (hdc, borderPen);
     Rectangle (hdc, x, y, x + width, y + 100);
     DeleteObject (borderPen);
 
+    // 绘制复选框（在选择模式下显示）
+    if (G_SelectMode)
+    {
+        int checkboxSize = 20;
+        int checkboxX = x + 15;
+        int checkboxY = y + (100 - checkboxSize) / 2;
+        DrawCheckbox (hdc, checkboxX, checkboxY, checkboxSize, isSelected, isHovered);
+    }
+
     // 绘制左侧彩色条
+    int accentX = G_SelectMode ? x + 45 : x + 4;
     COLORREF accentColor = record.isPinned ? RGB (255, 165, 0) : RGB (100, 149, 237);
     HBRUSH accentBrush = CreateSolidBrush (accentColor);
-    RECT accentRect = { x, y, x + 4, y + 100 };
+    RECT accentRect = { accentX, y, accentX + 4, y + 100 };
     FillRect (hdc, &accentRect, accentBrush);
     DeleteObject (accentBrush);
 
     // 绘制内容预览
-    int contentX = x + 15;
+    int contentX = G_SelectMode ? x + 55 : x + 15;
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
     HFONT contentFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
@@ -835,6 +889,97 @@ void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool 
 
     // 删除按钮
     DrawButton (hdc, buttonX + 130, buttonY, 55, 26, L"删除", false);
+}
+
+// 检查记录是否被选中
+bool IsItemSelected (int recordId)
+{
+    for (int id : G_SelectedItems)
+    {
+        if (id == recordId)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// 切换记录的选中状态
+void ToggleItemSelection (int recordId)
+{
+    for (auto it = G_SelectedItems.begin (); it != G_SelectedItems.end (); ++it)
+    {
+        if (*it == recordId)
+        {
+            G_SelectedItems.erase (it);
+            return;
+        }
+    }
+    G_SelectedItems.push_back (recordId);
+}
+
+// 全选/取消全选
+void ToggleSelectAll (const vector<ClipRecord>& records)
+{
+    if (G_SelectAll)
+    {
+        // 取消全选
+        G_SelectedItems.clear ();
+        G_SelectAll = false;
+    }
+    else
+    {
+        // 全选
+        G_SelectedItems.clear ();
+        for (const auto& record : records)
+        {
+            G_SelectedItems.push_back (record.id);
+        }
+        G_SelectAll = true;
+    }
+}
+
+// 批量删除选中的记录
+void BatchDeleteSelected (HWND hWnd)
+{
+    if (G_SelectedItems.empty ())
+    {
+        return;
+    }
+
+    // 显示确认对话框
+    wstring message = L"确定要删除选中的 " + to_wstring (G_SelectedItems.size ()) + L" 条记录吗？";
+    int result = MessageBoxW (hWnd, message.c_str (), L"确认删除", MB_YESNO | MB_ICONQUESTION);
+
+    if (result == IDYES)
+    {
+        vector<ClipRecord>& allRecords = const_cast<vector<ClipRecord>&> (G_ClipManager.GetRecords ());
+
+        // 删除选中的记录
+        for (int selectedId : G_SelectedItems)
+        {
+            for (auto it = allRecords.begin (); it != allRecords.end (); ++it)
+            {
+                if (it->id == selectedId)
+                {
+                    G_Storage.DeleteRecordFile (*it);
+                    allRecords.erase (it);
+                    break;
+                }
+            }
+        }
+
+        // 保存更改
+        G_Storage.SaveRecords (allRecords);
+
+        // 清空选中状态
+        G_SelectedItems.clear ();
+        G_SelectAll = false;
+        G_SelectMode = false;
+
+        // 刷新界面
+        InvalidateRect (hWnd, NULL, TRUE);
+    }
 }
 
 // 窗口过程函数
@@ -985,9 +1130,41 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             LineTo (hdc, 20 + searchWidth, 100);
             DeleteObject (linePen);
 
-            // 绘制历史记录列表
+            // 绘制全选复选框和批量删除按钮（在选择模式下）
             vector<ClipRecord> records = GetFilteredRecords ();
-            int cardY = 110 - G_ScrollOffset;
+            if (G_SelectMode)
+            {
+                // 绘制全选复选框
+                int checkboxSize = 20;
+                int checkboxX = 20;
+                int checkboxY = 105;
+                DrawCheckbox (hdc, checkboxX, checkboxY, checkboxSize, G_SelectAll, false);
+
+                // 绘制全选文字
+                SetTextColor (hdc, RGB (33, 33, 33));
+                SetBkMode (hdc, TRANSPARENT);
+                HFONT selectFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+                SelectObject (hdc, selectFont);
+                TextOut (hdc, checkboxX + 25, checkboxY + 2, L"全选", 2);
+                DeleteObject (selectFont);
+
+                // 绘制选中计数
+                wstring countText = L"已选中 " + to_wstring (G_SelectedItems.size ()) + L" 条";
+                HFONT countFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+                SelectObject (hdc, countFont);
+                SetTextColor (hdc, RGB (100, 100, 100));
+                TextOut (hdc, checkboxX + 80, checkboxY + 2, countText.c_str (), countText.length ());
+                DeleteObject (countFont);
+
+                // 绘制批量删除按钮
+                int deleteBtnX = G_WindowWidth - 120;
+                int deleteBtnY = checkboxY;
+                bool hasSelected = !G_SelectedItems.empty ();
+                DrawButton (hdc, deleteBtnX, deleteBtnY, 80, 26, L"删除选中", !hasSelected);
+            }
+
+            // 绘制历史记录列表
+            int cardY = G_SelectMode ? 135 : 110 - G_ScrollOffset;
             int cardHeight = 100;
             int cardMargin = 10;
 
@@ -1008,7 +1185,8 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 // 绘制卡片
                 bool isHovered = (i == G_HoverIndex);
-                DrawCard (hdc, 20, cardY, cardWidth, records[i], isHovered);
+                bool isSelected = IsItemSelected (records[i].id);
+                DrawCard (hdc, 20, cardY, cardWidth, records[i], isHovered, isSelected);
                 cardY += cardHeight + cardMargin;
             }
 
@@ -1100,16 +1278,56 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 return 0;
             }
 
+            // 检查是否点击了全选复选框（在选择模式下）
+            vector<ClipRecord> records = GetFilteredRecords ();
+            if (G_SelectMode)
+            {
+                int checkboxSize = 20;
+                int checkboxX = 20;
+                int checkboxY = 105;
+
+                if (x >= checkboxX && x <= checkboxX + checkboxSize && y >= checkboxY && y <= checkboxY + checkboxSize)
+                {
+                    ToggleSelectAll (records);
+                    InvalidateRect (hWnd, NULL, TRUE);
+                    return 0;
+                }
+
+                // 检查是否点击了批量删除按钮
+                int deleteBtnX = G_WindowWidth - 120;
+                int deleteBtnY = checkboxY;
+                if (x >= deleteBtnX && x <= deleteBtnX + 80 && y >= deleteBtnY && y <= deleteBtnY + 26)
+                {
+                    BatchDeleteSelected (hWnd);
+                    return 0;
+                }
+            }
+
             // 检查是否点击了卡片
-            int cardY = 110 - G_ScrollOffset;
+            int cardY = G_SelectMode ? 135 : 110 - G_ScrollOffset;
             int cardHeight = 100;
             int cardMargin = 10;
-            vector<ClipRecord> records = GetFilteredRecords ();
 
         for (int i = 0; i < (int)records.size (); i++)
         {
             if (y >= cardY && y < cardY + cardHeight && x >= 20 && x <= G_WindowWidth - 20)
             {
+                // 检查是否点击了复选框（在选择模式下）
+                if (G_SelectMode)
+                {
+                    int checkboxSize = 20;
+                    int checkboxX = 35;
+                    int checkboxY = cardY + (cardHeight - checkboxSize) / 2;
+
+                    if (x >= checkboxX && x <= checkboxX + checkboxSize && y >= checkboxY && y <= checkboxY + checkboxSize)
+                    {
+                        ToggleItemSelection (records[i].id);
+                        G_SelectAll = (G_SelectedItems.size () == records.size ());
+                        InvalidateRect (hWnd, NULL, TRUE);
+                        return 0;
+                    }
+                }
+
                 // 检查是否点击了按钮
                 int buttonX = 20 + G_WindowWidth - 40 - 200;
                 int buttonY = cardY + cardHeight - 32;
@@ -1162,9 +1380,12 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
                 }
 
-                // 点击卡片本身，复制内容
-                wstring copyText = records[i].content;
-                G_ClipManager.CopyToClipboard (copyText);
+                // 点击卡片本身，在非选择模式下复制内容
+                if (!G_SelectMode)
+                {
+                    wstring copyText = records[i].content;
+                    G_ClipManager.CopyToClipboard (copyText);
+                }
 
                 // 取消搜索框焦点
                 G_SearchFocused = false;
@@ -1358,6 +1579,46 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         InvalidateRect (hWnd, NULL, TRUE);
+        return 0;
+    }
+
+    case WM_RBUTTONDOWN:
+    {
+        int x = LOWORD (lParam);
+        int y = HIWORD (lParam);
+
+        if (G_CurrentPage == PAGE_MAIN)
+        {
+            // 显示右键菜单
+            POINT pt = { x, y };
+            ClientToScreen (hWnd, &pt);
+
+            HMENU hMenu = CreatePopupMenu ();
+            if (G_SelectMode)
+            {
+                AppendMenu (hMenu, MF_STRING, 1, L"退出选择模式");
+            }
+            else
+            {
+                AppendMenu (hMenu, MF_STRING, 1, L"进入选择模式");
+            }
+
+            SetForegroundWindow (hWnd);
+            int cmd = TrackPopupMenu (hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hWnd, NULL);
+            DestroyMenu (hMenu);
+
+            if (cmd == 1)
+            {
+                G_SelectMode = !G_SelectMode;
+                if (!G_SelectMode)
+                {
+                    // 退出选择模式时清空选中状态
+                    G_SelectedItems.clear ();
+                    G_SelectAll = false;
+                }
+                InvalidateRect (hWnd, NULL, TRUE);
+            }
+        }
         return 0;
     }
 
