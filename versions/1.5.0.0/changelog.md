@@ -16,7 +16,7 @@
 - **批量删除**：选中多条记录后，点击删除按钮一次性删除
 - **选择计数**：显示已选中记录的数量
 - **确认对话框**：批量删除前显示确认提示，防止误删
-- **右键菜单**：右键点击可进入/退出选择模式
+- **垃圾桶按钮**：点击标题栏垃圾桶按钮进入/退出选择模式
 
 ### 🔧 改进优化
 
@@ -46,11 +46,10 @@
 
 - `Main.cpp` - 添加全选/多选/批量删除功能
   - 添加全局变量：G_SelectMode, G_SelectAll, G_SelectedItems
-  - 添加函数：DrawCheckbox, IsItemSelected, ToggleItemSelection, ToggleSelectAll, BatchDeleteSelected
+  - 添加函数：DrawCheckbox, DrawDeleteModeButton, IsItemSelected, ToggleItemSelection, ToggleSelectAll, BatchDeleteSelected
   - 修改 DrawCard 函数支持选中状态显示
-  - 修改 WM_PAINT 消息处理，添加全选复选框和批量删除按钮
-  - 修改 WM_LBUTTONDOWN 消息处理，添加复选框和批量删除按钮点击处理
-  - 添加 WM_RBUTTONDOWN 消息处理，支持右键菜单进入/退出选择模式
+  - 修改 WM_PAINT 消息处理，添加全选复选框、批量删除按钮和垃圾桶按钮
+  - 修改 WM_LBUTTONDOWN 消息处理，添加复选框、批量删除按钮和垃圾桶按钮点击处理
   - 更新版本号到 1.5.0.0
 
 ## 开发日志
@@ -71,8 +70,9 @@
 - [x] 实现批量删除功能
 - [x] 添加确认对话框
 - [x] 界面优化
-- [ ] 功能测试
-- [ ] 文档更新
+- [x] 添加垃圾桶按钮切换选择模式
+- [x] 功能测试
+- [x] 文档更新
 - [ ] 合并到主分支
 
 ## 版本历史
