@@ -373,6 +373,27 @@ void DrawSettingsButton (HDC hdc, int x, int y, bool isHovered)
     DeleteObject (iconFont);
 }
 
+// 绘制垃圾桶按钮（选择模式切换）
+void DrawDeleteModeButton (HDC hdc, int x, int y, bool isHovered, bool isActive)
+{
+    int size = 32;
+
+    // 绘制背景
+    COLORREF bgColor = isActive ? RGB (255, 200, 200) : (isHovered ? RGB (220, 220, 220) : RGB (240, 240, 240));
+    HBRUSH bgBrush = CreateSolidBrush (bgColor);
+    RECT bgRect = { x, y, x + size, y + size };
+    FillRect (hdc, &bgRect, bgBrush);
+    DeleteObject (bgBrush);
+
+    // 绘制垃圾桶图标
+    SetTextColor (hdc, isActive ? RGB (200, 50, 50) : RGB (100, 100, 100));
+    SetBkMode (hdc, TRANSPARENT);
+    HFONT iconFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Segoe UI Emoji");
+    SelectObject (hdc, iconFont);
+    TextOut (hdc, x + 6, y + 4, L"🗑", 1);
+    DeleteObject (iconFont);
+}
+
 // 绘制返回按钮
 void DrawBackButton (HDC hdc, int x, int y, bool isHovered)
 {
@@ -1120,6 +1141,9 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             // 绘制设置按钮
             DrawSettingsButton (hdc, G_WindowWidth - 52, 10, false);
 
+            // 绘制垃圾桶按钮（选择模式切换）
+            DrawDeleteModeButton (hdc, G_WindowWidth - 92, 10, false, G_SelectMode);
+
             // 绘制搜索框
             DrawSearchBox (hdc, 20, 50, searchWidth);
 
@@ -1265,6 +1289,20 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (x >= G_WindowWidth - 52 && x <= G_WindowWidth - 20 && y >= 10 && y <= 42)
             {
                 G_CurrentPage = PAGE_SETTINGS;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+
+            // 检查是否点击了垃圾桶按钮（选择模式切换）
+            if (x >= G_WindowWidth - 92 && x <= G_WindowWidth - 60 && y >= 10 && y <= 42)
+            {
+                G_SelectMode = !G_SelectMode;
+                if (!G_SelectMode)
+                {
+                    // 退出选择模式时清空选中状态
+                    G_SelectedItems.clear ();
+                    G_SelectAll = false;
+                }
                 InvalidateRect (hWnd, NULL, TRUE);
                 return 0;
             }
@@ -1584,41 +1622,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_RBUTTONDOWN:
     {
-        int x = LOWORD (lParam);
-        int y = HIWORD (lParam);
-
-        if (G_CurrentPage == PAGE_MAIN)
-        {
-            // 显示右键菜单
-            POINT pt = { x, y };
-            ClientToScreen (hWnd, &pt);
-
-            HMENU hMenu = CreatePopupMenu ();
-            if (G_SelectMode)
-            {
-                AppendMenu (hMenu, MF_STRING, 1, L"退出选择模式");
-            }
-            else
-            {
-                AppendMenu (hMenu, MF_STRING, 1, L"进入选择模式");
-            }
-
-            SetForegroundWindow (hWnd);
-            int cmd = TrackPopupMenu (hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hWnd, NULL);
-            DestroyMenu (hMenu);
-
-            if (cmd == 1)
-            {
-                G_SelectMode = !G_SelectMode;
-                if (!G_SelectMode)
-                {
-                    // 退出选择模式时清空选中状态
-                    G_SelectedItems.clear ();
-                    G_SelectAll = false;
-                }
-                InvalidateRect (hWnd, NULL, TRUE);
-            }
-        }
+        // 右键菜单已移除，使用垃圾桶按钮切换选择模式
         return 0;
     }
 
