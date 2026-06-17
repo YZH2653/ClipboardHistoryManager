@@ -125,6 +125,15 @@ void MinimizeToTray (HWND hWnd)
 // 从托盘恢复窗口
 void RestoreFromTray (HWND hWnd)
 {
+    // 重置页面状态为主界面
+    G_CurrentPage = PAGE_MAIN;
+
+    // 重置选择模式状态
+    G_SelectMode = false;
+    G_SelectedItems.clear ();
+    G_SelectAll = false;
+
+    // 显示窗口
     ShowWindow (hWnd, SW_SHOW);
     SetForegroundWindow (hWnd);
     G_IsMinimizedToTray = false;
