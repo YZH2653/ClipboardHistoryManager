@@ -15,18 +15,18 @@
 
 ## 阶段2：修复托盘恢复页面问题
 
-### 步骤2.1：分析 RestoreFromTray 函数
-- [ ] 查看 RestoreFromTray 函数的当前实现
-- [ ] 确定需要修改的位置
-- [ ] 提交代码
+### 步骤2.1：分析 RestoreFromTray 函数 ✅
+- [x] 查看 RestoreFromTray 函数的当前实现
+- [x] 确定需要修改的位置
+- [x] 提交代码
 
-### 步骤2.2：修改 RestoreFromTray 函数
-- [ ] 在恢复窗口显示前，重置 G_CurrentPage 为 PAGE_MAIN
-- [ ] 在恢复窗口显示前，重置 G_SelectMode 为 false
-- [ ] 在恢复窗口显示前，清空 G_SelectedItems
-- [ ] 在恢复窗口显示前，重置 G_SelectAll 为 false
-- [ ] 刷新窗口显示
-- [ ] 提交代码
+### 步骤2.2：修改 RestoreFromTray 函数 ✅
+- [x] 在恢复窗口显示前，重置 G_CurrentPage 为 PAGE_MAIN
+- [x] 在恢复窗口显示前，重置 G_SelectMode 为 false
+- [x] 在恢复窗口显示前，清空 G_SelectedItems
+- [x] 在恢复窗口显示前，重置 G_SelectAll 为 false
+- [x] 刷新窗口显示
+- [x] 提交代码
 
 ---
 
