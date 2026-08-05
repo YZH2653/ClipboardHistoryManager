@@ -10,21 +10,34 @@
 using namespace std;
 
 // 获取exe所在目录的绝对路径
-static string GetExeDirA ()
+static wstring GetExeDirW ()
 {
-    char path[MAX_PATH];
-    GetModuleFileNameA (NULL, path, MAX_PATH);
-    string fullPath (path);
-    size_t pos = fullPath.find_last_of ("\\");
-    if (pos != string::npos)
+    wchar_t path[MAX_PATH];
+    GetModuleFileNameW (NULL, path, MAX_PATH);
+    wstring fullPath (path);
+    size_t pos = fullPath.find_last_of (L"\\");
+    if (pos != wstring::npos)
     {
         return fullPath.substr (0, pos);
     }
     return fullPath;
 }
 
+// 将宽字符串转换为 UTF-8 字符串
+static string WstringToUtf8 (const wstring& wstr)
+{
+    if (wstr.empty ())
+        return string ();
+
+    int size_needed = WideCharToMultiByte (CP_UTF8, 0, &wstr[0], (int)wstr.size (), NULL, 0, NULL, NULL);
+    string strTo (size_needed, 0);
+    WideCharToMultiByte (CP_UTF8, 0, &wstr[0], (int)wstr.size (), &strTo[0], size_needed, NULL, NULL);
+    return strTo;
+}
+
 // 全局变量
-static string g_exeDir = "";
+static wstring g_wideExeDir = L"";  // 宽字符串形式
+static string g_exeDir = "";       // UTF-8字符串形式
 static sqlite3* g_db = NULL;
 
 // 构造函数
@@ -47,7 +60,8 @@ Storage::~Storage ()
 void Storage::SetRootDir (const wstring& rootDir)
 {
     m_rootDir = rootDir;
-    g_exeDir = GetExeDirA ();
+    g_wideExeDir = GetExeDirW ();
+    g_exeDir = WstringToUtf8 (g_wideExeDir);
 }
 
 // 初始化存储系统

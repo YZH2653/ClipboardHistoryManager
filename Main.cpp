@@ -22,8 +22,8 @@ ClipboardManager G_ClipManager;
 Storage G_Storage;
 
 // 版本号
-const wchar_t* APP_VERSION = L"1.5.0.0";
-const wchar_t* APP_UPDATE_DATE = L"2026-06-13";
+const wchar_t* APP_VERSION = L"1.6.0.0";
+const wchar_t* APP_UPDATE_DATE = L"2026-08-05";
 const wchar_t* APP_AUTHOR = L"YZH2653";
 const wchar_t* APP_AUTHOR_EMAIL = L"yzh2653@163.com";
 const wchar_t* APP_GITHUB_URL = L"https://github.com/YZH2653/ClipboardHistoryManager";
@@ -150,19 +150,19 @@ bool MatchTimeFilter (const wstring& searchText, time_t timestamp)
 
     // 格式化日期：YYYY-MM-DD
     wchar_t dateStr[20];
-    wcsftime (dateStr, 20, L"%Y-%m-%d", &timeInfo);
+    std::wcsftime (dateStr, 20, L"%Y-%m-%d", &timeInfo);
 
     // 格式化日期：MM-DD
     wchar_t shortDateStr[10];
-    wcsftime (shortDateStr, 10, L"%m-%d", &timeInfo);
+    std::wcsftime (shortDateStr, 10, L"%m-%d", &timeInfo);
 
     // 格式化时间：HH:MM
     wchar_t timeStr[10];
-    wcsftime (timeStr, 10, L"%H:%M", &timeInfo);
+    std::wcsftime (timeStr, 10, L"%H:%M", &timeInfo);
 
     // 格式化年月：YYYY-MM
     wchar_t yearMonthStr[10];
-    wcsftime (yearMonthStr, 10, L"%Y-%m", &timeInfo);
+    std::wcsftime (yearMonthStr, 10, L"%Y-%m", &timeInfo);
 
     // 检查是否匹配日期格式（YYYY-MM-DD）
     if (searchText.length () == 10 && searchText[4] == L'-' && searchText[7] == L'-')
@@ -205,7 +205,7 @@ bool MatchTimeFilter (const wstring& searchText, time_t timestamp)
         if (searchText.length () == 4)
         {
             wchar_t yearStr[6];
-            wcsftime (yearStr, 6, L"%Y", &timeInfo);
+            std::wcsftime (yearStr, 6, L"%Y", &timeInfo);
             return wcsstr (yearStr, searchText.c_str ()) != NULL;
         }
 
@@ -213,7 +213,7 @@ bool MatchTimeFilter (const wstring& searchText, time_t timestamp)
         if (searchText.length () == 2 || searchText.length () == 1)
         {
             wchar_t monthStr[4];
-            wcsftime (monthStr, 4, L"%m", &timeInfo);
+            std::wcsftime (monthStr, 4, L"%m", &timeInfo);
             return wcsstr (monthStr, searchText.c_str ()) != NULL;
         }
 
@@ -221,7 +221,7 @@ bool MatchTimeFilter (const wstring& searchText, time_t timestamp)
         if (searchText.length () == 2 || searchText.length () == 1)
         {
             wchar_t dayStr[4];
-            wcsftime (dayStr, 4, L"%d", &timeInfo);
+            std::wcsftime (dayStr, 4, L"%d", &timeInfo);
             return wcsstr (dayStr, searchText.c_str ()) != NULL;
         }
     }
@@ -266,6 +266,148 @@ vector<ClipRecord> GetFilteredRecords ()
     return result;
 }
 
+// 字体缓存
+static wstring G_CachedFontName;
+static bool G_FontInitialized = false;
+
+// 获取系统可用字体
+static wstring GetAvailableFont ()
+{
+    // 如果已经缓存，直接返回
+    if (G_FontInitialized && !G_CachedFontName.empty())
+    {
+        return G_CachedFontName;
+    }
+    // 扩展的优先字体列表（按优先级排序）
+    const wchar_t* priorityFonts[] = {
+        // 中文首选字体
+        L"Microsoft YaHei UI",      // Windows 8/10/11 默认中文字体
+        L"Microsoft YaHei",        // 旧版 Windows 中文字体
+        L"SimSun",                 // 宋体
+        L"SimHei",                 // 黑体
+        L"KaiTi",                  // 楷体
+        L"FangSong",               // 仿宋
+        L"Segoe UI",               // Windows 默认英文字体
+        L"Arial",                  // 通用字体
+        L"Calibri",                // Office 套装字体
+        L"Times New Roman",        // Times 衬线字体
+        L"Consolas",               // 等宽字体
+
+        // 其他备选字体
+        L"Tahoma",                 // Windows 经典字体
+        L"Verdana",                // Web 常用字体
+        L"Trebuchet MS",           // 现代无衬线字体
+        L"Lucida Sans",           // 清晰无衬线字体
+        L"Helvetica Neue",         // macOS 常见字体
+
+        // 最后的回退选项
+        L"MS Sans Serif",          // Windows 95/98 字体
+        L"System",                 // 系统默认字体
+        L"Roman"                  // 基础衬线字体
+    };
+
+    // 字体样式测试
+    LOGFONT lf = { 0 };
+    lf.lfHeight = -12;  // 使用负值表示字体高度的单位
+    lf.lfWeight = FW_NORMAL;
+    lf.lfCharSet = DEFAULT_CHARSET;
+    lf.lfQuality = DEFAULT_QUALITY;
+    lf.lfPitchAndFamily = DEFAULT_PITCH | FF_DONTCARE;
+
+    HDC hdc = GetDC (NULL);
+    if (hdc == NULL)
+    {
+        return L"Microsoft YaHei UI";  // 默认字体
+    }
+
+    // 依次测试每个字体
+    for (const wchar_t* fontName : priorityFonts)
+    {
+        wcscpy_s (lf.lfFaceName, fontName);
+        HFONT hFont = CreateFontIndirect (&lf);
+        if (hFont)
+        {
+            // 验证字体是否真的可用
+            HFONT oldFont = (HFONT)SelectObject (hdc, hFont);
+            if (oldFont)
+            {
+                // 尝试绘制中英文字符来测试字体
+                TEXTMETRIC tm;
+                if (GetTextMetrics (hdc, &tm) && tm.tmHeight > 0)
+                {
+                    // 额外的字体验证：尝试绘制实际的文本内容
+                    const wchar_t* testText = L"测试Test";
+                    RECT testRect = { 0, 0, 100, 50 };
+                    DrawTextW (hdc, testText, -1, &testRect, DT_CALCRECT | DT_NOPREFIX);
+                    if (testRect.right > 10)  // 文本宽度合理
+                    {
+                        SelectObject (hdc, oldFont);
+                        DeleteObject (hFont);
+                        ReleaseDC (NULL, hdc);
+                        return fontName;  // 返回可用的字体
+                    }
+                }
+                SelectObject (hdc, oldFont);
+            }
+            DeleteObject (hFont);
+        }
+    }
+
+    ReleaseDC (NULL, hdc);
+
+    // 如果所有字体都不可用，使用更安全的回退方案
+    HDC hdcBackup = GetDC (NULL);
+    if (hdcBackup)
+    {
+        // 尝试获取系统默认字体
+        NONCLIENTMETRICSW ncmetrics;
+        ncmetrics.cbSize = sizeof (NONCLIENTMETRICSW);
+        if (SystemParametersInfoW (SPI_GETNONCLIENTMETRICS, sizeof (ncmetrics), &ncmetrics, 0))
+        {
+            HFONT defaultFont = CreateFontIndirectW (&ncmetrics.lfMessageFont);
+            if (defaultFont)
+            {
+                HFONT oldFont = (HFONT)SelectObject (hdcBackup, defaultFont);
+                if (oldFont)
+                {
+                    TEXTMETRIC tm;
+                    if (GetTextMetrics (hdcBackup, &tm) && tm.tmHeight > 0)
+                    {
+                        SelectObject (hdcBackup, oldFont);
+                        DeleteObject (defaultFont);
+                        ReleaseDC (NULL, hdcBackup);
+                        return L"系统默认字体";  // 使用系统默认字体
+                    }
+                    SelectObject (hdcBackup, oldFont);
+                }
+                DeleteObject (defaultFont);
+            }
+        }
+        ReleaseDC (NULL, hdcBackup);
+    }
+
+    // 最终回退
+    wstring fallbackFont = L"System";
+
+    // 缓存结果
+    G_CachedFontName = fallbackFont;
+    G_FontInitialized = true;
+
+    return fallbackFont;
+}
+
+// 创建字体对象的辅助函数
+HFONT CreateFontHelper(int size, bool bold = false, const wchar_t* faceName = nullptr)
+{
+    if (!faceName)
+    {
+        faceName = GetAvailableFont().c_str();
+    }
+    return CreateFont(size, 0, 0, 0, bold ? FW_BOLD : FW_NORMAL, FALSE, FALSE, FALSE,
+                      DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                      DEFAULT_QUALITY, DEFAULT_PITCH, faceName);
+}
+
 // 绘制搜索框
 void DrawSearchBox (HDC hdc, int x, int y, int width)
 {
@@ -286,13 +428,14 @@ void DrawSearchBox (HDC hdc, int x, int y, int width)
     // 绘制搜索图标
     SetTextColor (hdc, RGB (150, 150, 150));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT iconFont = CreateFont (22, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Segoe UI Emoji");
+    HFONT iconFont = CreateFont (22, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont ().c_str ());
     SelectObject (hdc, iconFont);
     TextOut (hdc, x + 15, y + 12, L"🔍", 1);
     DeleteObject (iconFont);
 
     // 绘制输入文本
-    HFONT inputFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    wstring fontName = GetAvailableFont ();
+    HFONT inputFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, fontName.c_str ());
     SelectObject (hdc, inputFont);
 
     if (G_SearchText.empty () && !G_SearchFocused)
@@ -315,7 +458,7 @@ void DrawSearchBox (HDC hdc, int x, int y, int width)
         SIZE textSize = { 0, 0 };
         if (!G_SearchText.empty ())
         {
-            HFONT tempFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+            HFONT tempFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
             SelectObject (hdc, tempFont);
             GetTextExtentPoint32 (hdc, G_SearchText.c_str (), G_SearchText.length (), &textSize);
             DeleteObject (tempFont);
@@ -349,7 +492,7 @@ void DrawButton (HDC hdc, int x, int y, int width, int height, const wstring& te
     // 绘制文字
     SetTextColor (hdc, RGB (80, 80, 80));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT btnFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT btnFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, btnFont);
 
     SIZE textSize;
@@ -425,7 +568,7 @@ void DrawBackButton (HDC hdc, int x, int y, bool isHovered)
     // 绘制文字
     SetTextColor (hdc, RGB (80, 80, 80));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT btnFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT btnFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, btnFont);
     TextOut (hdc, x + 12, y + 7, L"← 返回", 5);
     DeleteObject (btnFont);
@@ -440,7 +583,7 @@ void DrawSettingsPage (HDC hdc)
     // 绘制标题
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT titleFont = CreateFont (36, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT titleFont = CreateFont (36, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, titleFont);
     TextOut (hdc, 100, 12, L"设置", 2);
     DeleteObject (titleFont);
@@ -455,7 +598,7 @@ void DrawSettingsPage (HDC hdc)
 
     // 保存时间设置
     SetTextColor (hdc, RGB (33, 33, 33));
-    HFONT sectionFont = CreateFont (26, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT sectionFont = CreateFont (26, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, sectionFont);
     TextOut (hdc, 20, 80, L"保存时间", 4);
     DeleteObject (sectionFont);
@@ -483,7 +626,7 @@ void DrawSettingsPage (HDC hdc)
     // 绘制当前选中的值
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT valueFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT valueFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, valueFont);
     TextOut (hdc, dropdownX + 15, dropdownY + 10, RETENTION_LABELS[G_SelectedRetentionIndex], wcslen (RETENTION_LABELS[G_SelectedRetentionIndex]));
 
@@ -498,7 +641,7 @@ void DrawSettingsPage (HDC hdc)
 
     // 开机自启设置
     SetTextColor (hdc, RGB (33, 33, 33));
-    HFONT autoStartFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT autoStartFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, autoStartFont);
     TextOut (hdc, 20, 158, L"开机自启", 4);
 
@@ -528,7 +671,7 @@ void DrawSettingsPage (HDC hdc)
     // 绘制开关文字
     SetBkMode (hdc, TRANSPARENT);
     SetTextColor (hdc, RGB (255, 255, 255));
-    HFONT toggleFont = CreateFont (22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT toggleFont = CreateFont (22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, toggleFont);
     const wchar_t* toggleText = G_AutoStart ? L"开" : L"关";
     SIZE toggleTextSize;
@@ -545,7 +688,7 @@ void DrawSettingsPage (HDC hdc)
 
     // 关闭时最小化到托盘设置
     SetTextColor (hdc, RGB (33, 33, 33));
-    HFONT minimizeFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT minimizeFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, minimizeFont);
     TextOut (hdc, 20, 218, L"关闭时最小化到托盘", 9);
 
@@ -574,7 +717,7 @@ void DrawSettingsPage (HDC hdc)
     // 绘制开关文字
     SetBkMode (hdc, TRANSPARENT);
     SetTextColor (hdc, RGB (255, 255, 255));
-    HFONT minimizeToggleFont = CreateFont (22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT minimizeToggleFont = CreateFont (22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, minimizeToggleFont);
     const wchar_t* minimizeToggleText = G_MinimizeToTray ? L"开" : L"关";
     SIZE minimizeToggleTextSize;
@@ -591,7 +734,7 @@ void DrawSettingsPage (HDC hdc)
 
     // 版本信息入口
     int versionY = 280;
-    HFONT versionFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT versionFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, versionFont);
     SetTextColor (hdc, RGB (33, 33, 33));
     TextOut (hdc, 20, versionY, L"版本信息", 4);
@@ -620,7 +763,7 @@ void DrawSettingsPage (HDC hdc)
 
     // GitHub 仓库地址
     int githubY = G_WindowHeight - 60;
-    HFONT githubFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT githubFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, githubFont);
     SetTextColor (hdc, RGB (100, 100, 100));
     SetBkMode (hdc, TRANSPARENT);
@@ -660,7 +803,7 @@ void DrawSettingsPage (HDC hdc)
             COLORREF textColor = isSelected ? RGB (100, 149, 237) : RGB (33, 33, 33);
             SetTextColor (hdc, textColor);
             SetBkMode (hdc, TRANSPARENT);
-            HFONT optionFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+            HFONT optionFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
             SelectObject (hdc, optionFont);
 
             SIZE textSize;
@@ -692,7 +835,7 @@ void DrawVersionPage (HDC hdc)
     // 绘制标题
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT titleFont = CreateFont (36, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT titleFont = CreateFont (36, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, titleFont);
     TextOut (hdc, 100, 12, L"版本信息", 4);
     DeleteObject (titleFont);
@@ -708,7 +851,7 @@ void DrawVersionPage (HDC hdc)
     int contentY = 80;
     int lineHeight = 50;
 
-    HFONT contentFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT contentFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, contentFont);
 
     // 版本号
@@ -732,11 +875,17 @@ void DrawVersionPage (HDC hdc)
 
     // 更新内容列表
     SetTextColor (hdc, RGB (33, 33, 33));
-    TextOut (hdc, 40, contentY, L"• 新增设置页面", 8);
+    TextOut (hdc, 40, contentY, L"• 优化字体处理，添加字体缓存机制", 10);
     contentY += 35;
-    TextOut (hdc, 40, contentY, L"• 支持保存时间配置", 10);
+    TextOut (hdc, 40, contentY, L"• 修复GetAvailableFont递归调用问题", 10);
     contentY += 35;
-    TextOut (hdc, 40, contentY, L"• 显示版本信息", 8);
+    TextOut (hdc, 40, contentY, L"• 添加CreateFontHelper辅助函数", 9);
+    contentY += 35;
+    TextOut (hdc, 40, contentY, L"• 修复wcsftime命名空间冲突", 8);
+    contentY += 35;
+    TextOut (hdc, 40, contentY, L"• 清理调试代码和日志输出", 8);
+    contentY += 35;
+    TextOut (hdc, 40, contentY, L"• 更新版本号到1.6.0.0", 8);
     contentY += lineHeight + 20;
 
     // 作者
@@ -757,7 +906,7 @@ void DrawFeedbackPage (HDC hdc)
     // 绘制标题
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT titleFont = CreateFont (36, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT titleFont = CreateFont (36, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, titleFont);
     TextOut (hdc, 100, 12, L"问题反馈", 4);
     DeleteObject (titleFont);
@@ -773,7 +922,7 @@ void DrawFeedbackPage (HDC hdc)
     int contentY = 80;
     int lineHeight = 45;
 
-    HFONT contentFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT contentFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, contentFont);
 
     // 作者邮箱
@@ -785,14 +934,14 @@ void DrawFeedbackPage (HDC hdc)
 
     // 反馈格式说明
     SetTextColor (hdc, RGB (33, 33, 33));
-    HFONT hintFont = CreateFont (28, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT hintFont = CreateFont (28, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, hintFont);
     TextOut (hdc, 20, contentY, L"请按以下格式写:", 8);
     DeleteObject (hintFont);
     contentY += lineHeight;
 
     // 反馈格式内容
-    HFONT formatFont = CreateFont (22, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT formatFont = CreateFont (22, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, formatFont);
 
     SetTextColor (hdc, RGB (80, 80, 80));
@@ -883,7 +1032,7 @@ void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool 
     int contentX = G_SelectMode ? x + 55 : x + 15;
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT contentFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT contentFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, contentFont);
 
     wstring preview = record.preview;
@@ -899,9 +1048,9 @@ void DrawCard (HDC hdc, int x, int y, int width, const ClipRecord& record, bool 
     struct tm timeInfo;
     localtime_s (&timeInfo, &timestamp);
     wchar_t timeStr[32];
-    wcsftime (timeStr, 32, L"%Y-%m-%d %H:%M", &timeInfo);
+    std::wcsftime (timeStr, 32, L"%Y-%m-%d %H:%M", &timeInfo);
     SetTextColor (hdc, RGB (150, 150, 150));
-    HFONT timeFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+    HFONT timeFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, timeFont);
     TextOut (hdc, contentX, y + 65, timeStr, wcslen (timeStr));
     DeleteObject (timeFont);
@@ -1142,7 +1291,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             // 绘制标题
             SetTextColor (hdc, RGB (33, 33, 33));
             SetBkMode (hdc, TRANSPARENT);
-            HFONT titleFont = CreateFont (32, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+            HFONT titleFont = CreateFont (32, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
             SelectObject (hdc, titleFont);
             TextOut (hdc, 20, 12, L"历史剪贴板管理器", 8);
             DeleteObject (titleFont);
@@ -1176,14 +1325,14 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 // 绘制全选文字
                 SetTextColor (hdc, RGB (33, 33, 33));
                 SetBkMode (hdc, TRANSPARENT);
-                HFONT selectFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+                HFONT selectFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
                 SelectObject (hdc, selectFont);
                 TextOut (hdc, checkboxX + 25, checkboxY + 2, L"全选", 2);
                 DeleteObject (selectFont);
 
                 // 绘制选中计数
                 wstring countText = L"已选中 " + to_wstring (G_SelectedItems.size ()) + L" 条";
-                HFONT countFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+                HFONT countFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
                 SelectObject (hdc, countFont);
                 SetTextColor (hdc, RGB (100, 100, 100));
                 TextOut (hdc, checkboxX + 80, checkboxY + 2, countText.c_str (), countText.length ());
@@ -1226,7 +1375,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             // 如果没有记录，显示提示
             if (records.empty ())
             {
-                HFONT hintFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei");
+                HFONT hintFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
                 SelectObject (hdc, hintFont);
                 SetTextColor (hdc, RGB (150, 150, 150));
                 wstring hintText = G_SearchText.empty () ? L"暂无历史记录，请复制内容测试" : L"未找到匹配的记录";
