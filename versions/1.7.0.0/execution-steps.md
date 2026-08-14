@@ -75,11 +75,11 @@
 - [ ] 测试清理规则导入导出
 
 ### 步骤5.2：更新文档
-- [ ] 更新版本开发日志
-- [ ] 更新 changelog.md
-- [ ] 更新根 README.md
-- [ ] 更新 versions/README.md
-- [ ] 提交文档
+- [x] 更新版本开发日志
+- [x] 更新 changelog.md
+- [x] 更新根 README.md
+- [x] 更新 versions/README.md
+- [x] 提交文档
 
 ### 步骤5.3：合并主干
 - [ ] 将 1.7.0.0 分支合并到 main 分支
