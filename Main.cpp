@@ -22,8 +22,8 @@ ClipboardManager G_ClipManager;
 Storage G_Storage;
 
 // 版本号
-const wchar_t* APP_VERSION = L"1.6.0.0";
-const wchar_t* APP_UPDATE_DATE = L"2026-08-05";
+const wchar_t* APP_VERSION = L"1.7.0.0";
+const wchar_t* APP_UPDATE_DATE = L"2026-08-14";
 const wchar_t* APP_AUTHOR = L"YZH2653";
 const wchar_t* APP_AUTHOR_EMAIL = L"yzh2653@163.com";
 const wchar_t* APP_GITHUB_URL = L"https://github.com/YZH2653/ClipboardHistoryManager";
@@ -34,7 +34,8 @@ enum PageState
     PAGE_MAIN,
     PAGE_SETTINGS,
     PAGE_VERSION,
-    PAGE_FEEDBACK
+    PAGE_FEEDBACK,
+    PAGE_CLEANUP_RULES
 };
 PageState G_CurrentPage = PAGE_MAIN;
 
@@ -732,8 +733,23 @@ void DrawSettingsPage (HDC hdc)
     MoveToEx (hdc, 20, 260, NULL);
     LineTo (hdc, G_WindowWidth - 20, 260);
 
+    // 清理规则入口
+    int cleanupY = 280;
+    HFONT cleanupFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
+    SelectObject (hdc, cleanupFont);
+    SetTextColor (hdc, RGB (33, 33, 33));
+    TextOut (hdc, 20, cleanupY, L"清理规则", 4);
+
+    // 绘制箭头
+    SetTextColor (hdc, RGB (150, 150, 150));
+    TextOut (hdc, G_WindowWidth - 40, cleanupY, L"→", 1);
+
+    // 绘制分割线
+    MoveToEx (hdc, 20, cleanupY + 40, NULL);
+    LineTo (hdc, G_WindowWidth - 20, cleanupY + 40);
+
     // 版本信息入口
-    int versionY = 280;
+    int versionY = 340;
     HFONT versionFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
     SelectObject (hdc, versionFont);
     SetTextColor (hdc, RGB (33, 33, 33));
@@ -748,13 +764,14 @@ void DrawSettingsPage (HDC hdc)
     LineTo (hdc, G_WindowWidth - 20, versionY + 40);
 
     // 问题反馈入口
-    int feedbackY = 340;
+    int feedbackY = 400;
     SetTextColor (hdc, RGB (33, 33, 33));
     TextOut (hdc, 20, feedbackY, L"问题反馈", 4);
 
     // 绘制箭头
     SetTextColor (hdc, RGB (150, 150, 150));
     TextOut (hdc, G_WindowWidth - 40, feedbackY, L"→", 1);
+    DeleteObject (cleanupFont);
     DeleteObject (versionFont);
 
     // 绘制分割线
@@ -875,17 +892,17 @@ void DrawVersionPage (HDC hdc)
 
     // 更新内容列表
     SetTextColor (hdc, RGB (33, 33, 33));
-    TextOut (hdc, 40, contentY, L"• 优化字体处理，添加字体缓存机制", 10);
+    TextOut (hdc, 40, contentY, L"• 新增自动清理规则功能", 10);
     contentY += 35;
-    TextOut (hdc, 40, contentY, L"• 修复GetAvailableFont递归调用问题", 10);
+    TextOut (hdc, 40, contentY, L"• 支持按时间、数量、大小清理", 10);
     contentY += 35;
-    TextOut (hdc, 40, contentY, L"• 添加CreateFontHelper辅助函数", 9);
+    TextOut (hdc, 40, contentY, L"• 支持多个清理规则优先级", 9);
     contentY += 35;
-    TextOut (hdc, 40, contentY, L"• 修复wcsftime命名空间冲突", 8);
+    TextOut (hdc, 40, contentY, L"• 支持规则预览功能", 8);
     contentY += 35;
-    TextOut (hdc, 40, contentY, L"• 清理调试代码和日志输出", 8);
+    TextOut (hdc, 40, contentY, L"• 支持规则导入导出", 8);
     contentY += 35;
-    TextOut (hdc, 40, contentY, L"• 更新版本号到1.6.0.0", 8);
+    TextOut (hdc, 40, contentY, L"• 更新版本号到1.7.0.0", 8);
     contentY += lineHeight + 20;
 
     // 作者
@@ -953,6 +970,110 @@ void DrawFeedbackPage (HDC hdc)
 
     DeleteObject (formatFont);
     DeleteObject (contentFont);
+}
+
+// 绘制清理规则管理页面
+void DrawCleanupRulesPage (HDC hdc)
+{
+    // 绘制返回按钮
+    DrawBackButton (hdc, 20, 10, false);
+
+    // 绘制标题
+    SetTextColor (hdc, RGB (33, 33, 33));
+    SetBkMode (hdc, TRANSPARENT);
+    HFONT titleFont = CreateFont (36, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
+    SelectObject (hdc, titleFont);
+    TextOut (hdc, 100, 12, L"清理规则", 4);
+    DeleteObject (titleFont);
+
+    // 绘制分割线
+    HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
+    SelectObject (hdc, linePen);
+    MoveToEx (hdc, 20, 55, NULL);
+    LineTo (hdc, G_WindowWidth - 20, 55);
+    DeleteObject (linePen);
+
+    // 获取清理规则管理器
+    CleanupRuleManager& ruleManager = G_Storage.GetCleanupRuleManager ();
+    vector<CleanupRule> rules = ruleManager.GetRules ();
+
+    // 绘制规则列表
+    int ruleY = 70;
+    int ruleHeight = 80;
+    int ruleMargin = 10;
+
+    for (int i = 0; i < (int)rules.size (); i++)
+    {
+        const CleanupRule& rule = rules[i];
+
+        // 绘制规则背景
+        COLORREF bgColor = rule.enabled ? RGB (255, 255, 255) : RGB (245, 245, 245);
+        HBRUSH bgBrush = CreateSolidBrush (bgColor);
+        RECT bgRect = { 20, ruleY, G_WindowWidth - 20, ruleY + ruleHeight };
+        FillRect (hdc, &bgRect, bgBrush);
+        DeleteObject (bgBrush);
+
+        // 绘制边框
+        HPEN borderPen = CreatePen (PS_SOLID, 1, RGB (220, 220, 220));
+        SelectObject (hdc, borderPen);
+        Rectangle (hdc, 20, ruleY, G_WindowWidth - 20, ruleY + ruleHeight);
+        DeleteObject (borderPen);
+
+        // 绘制规则名称
+        SetTextColor (hdc, rule.enabled ? RGB (33, 33, 33) : RGB (150, 150, 150));
+        SetBkMode (hdc, TRANSPARENT);
+        HFONT nameFont = CreateFont (22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
+        SelectObject (hdc, nameFont);
+        TextOut (hdc, 30, ruleY + 10, rule.name.c_str (), rule.name.length ());
+        DeleteObject (nameFont);
+
+        // 绘制规则类型
+        wstring typeText;
+        switch (rule.type)
+        {
+        case RULE_BY_TIME:
+            typeText = L"按时间清理 - 保留 " + to_wstring (rule.days) + L" 天";
+            break;
+        case RULE_BY_COUNT:
+            typeText = L"按数量清理 - 保留 " + to_wstring (rule.maxRecords) + L" 条";
+            break;
+        case RULE_BY_SIZE:
+            typeText = L"按大小清理 - 保留 " + to_wstring (rule.maxSizeMB) + L" MB";
+            break;
+        }
+
+        HFONT typeFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
+        SelectObject (hdc, typeFont);
+        SetTextColor (hdc, rule.enabled ? RGB (100, 100, 100) : RGB (180, 180, 180));
+        TextOut (hdc, 30, ruleY + 40, typeText.c_str (), typeText.length ());
+        DeleteObject (typeFont);
+
+        // 绘制启用/禁用状态
+        wstring statusText = rule.enabled ? L"已启用" : L"已禁用";
+        COLORREF statusColor = rule.enabled ? RGB (74, 144, 217) : RGB (200, 200, 200);
+        HFONT statusFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
+        SelectObject (hdc, statusFont);
+        SetTextColor (hdc, statusColor);
+        TextOut (hdc, G_WindowWidth - 100, ruleY + 10, statusText.c_str (), statusText.length ());
+        DeleteObject (statusFont);
+
+        ruleY += ruleHeight + ruleMargin;
+    }
+
+    // 如果没有规则，显示提示
+    if (rules.empty ())
+    {
+        HFONT hintFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
+        SelectObject (hdc, hintFont);
+        SetTextColor (hdc, RGB (150, 150, 150));
+        TextOut (hdc, G_WindowWidth / 2 - 150, G_WindowHeight / 2, L"暂无清理规则", 6);
+        DeleteObject (hintFont);
+    }
+
+    // 绘制添加规则按钮
+    int addBtnX = G_WindowWidth - 120;
+    int addBtnY = G_WindowHeight - 50;
+    DrawButton (hdc, addBtnX, addBtnY, 80, 30, L"添加规则", false);
 }
 
 // 绘制复选框
@@ -1398,6 +1519,11 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             // 问题反馈页面
             DrawFeedbackPage (hdc);
         }
+        else if (G_CurrentPage == PAGE_CLEANUP_RULES)
+        {
+            // 清理规则管理页面
+            DrawCleanupRulesPage (hdc);
+        }
 
         EndPaint (hWnd, &ps);
         return 0;
@@ -1681,8 +1807,17 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 return 0;
             }
 
-            // 检查是否点击了版本信息入口
+            // 检查是否点击了清理规则入口
             if (x >= 20 && x <= G_WindowWidth - 20 && y >= 280 && y <= 320)
+            {
+                G_CurrentPage = PAGE_CLEANUP_RULES;
+                G_DropdownOpen = false;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+
+            // 检查是否点击了版本信息入口
+            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 340 && y <= 380)
             {
                 G_CurrentPage = PAGE_VERSION;
                 G_DropdownOpen = false;
@@ -1691,7 +1826,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
 
             // 检查是否点击了问题反馈入口
-            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 340 && y <= 380)
+            if (x >= 20 && x <= G_WindowWidth - 20 && y >= 400 && y <= 440)
             {
                 G_CurrentPage = PAGE_FEEDBACK;
                 G_DropdownOpen = false;
@@ -1729,6 +1864,28 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 G_CurrentPage = PAGE_SETTINGS;
                 InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+        }
+        else if (G_CurrentPage == PAGE_CLEANUP_RULES)
+        {
+            // 清理规则管理页面点击处理
+
+            // 检查是否点击了返回按钮
+            if (x >= 20 && x <= 80 && y >= 8 && y <= 38)
+            {
+                G_CurrentPage = PAGE_SETTINGS;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+
+            // 检查是否点击了添加规则按钮
+            int addBtnX = G_WindowWidth - 120;
+            int addBtnY = G_WindowHeight - 50;
+            if (x >= addBtnX && x <= addBtnX + 80 && y >= addBtnY && y <= addBtnY + 30)
+            {
+                // TODO: 添加规则对话框
+                MessageBoxW (hWnd, L"添加规则功能即将实现", L"提示", MB_OK);
                 return 0;
             }
         }

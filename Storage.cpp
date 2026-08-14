@@ -6,8 +6,11 @@
 #include <windows.h>
 #include <string>
 #include <vector>
+#include <fstream>
 #include "sqlite3.h"
+#include "json.hpp"
 using namespace std;
+using json = nlohmann::json;
 
 // 获取exe所在目录的绝对路径
 static wstring GetExeDirW ()
@@ -62,6 +65,9 @@ void Storage::SetRootDir (const wstring& rootDir)
     m_rootDir = rootDir;
     g_wideExeDir = GetExeDirW ();
     g_exeDir = WstringToUtf8 (g_wideExeDir);
+
+    // 设置清理规则管理器的根目录
+    m_cleanupRuleManager.SetRootDir (rootDir);
 }
 
 // 初始化存储系统
@@ -111,6 +117,9 @@ bool Storage::Initialize ()
         if (errMsg) sqlite3_free (errMsg);
         return false;
     }
+
+    // 加载清理规则
+    m_cleanupRuleManager.LoadRules ();
 
     m_initialized = true;
     return true;
@@ -516,4 +525,397 @@ string wstring_to_string (const wstring& wstr)
     string result (size, 0);
     WideCharToMultiByte (CP_ACP, 0, wstr.c_str (), (int)wstr.length (), &result[0], size, NULL, NULL);
     return result;
+}
+
+// CleanupRuleManager 实现
+
+// 构造函数
+CleanupRuleManager::CleanupRuleManager ()
+    : m_nextId (1)
+{
+}
+
+// 析构函数
+CleanupRuleManager::~CleanupRuleManager ()
+{
+}
+
+// 设置存储目录
+void CleanupRuleManager::SetRootDir (const wstring& rootDir)
+{
+    m_rootDir = rootDir;
+}
+
+// 获取规则配置文件路径
+wstring CleanupRuleManager::GetRulesPath ()
+{
+    return m_rootDir + L"\\clips\\cleanup_rules.json";
+}
+
+// 生成下一个规则ID
+int CleanupRuleManager::GenerateRuleId ()
+{
+    return m_nextId++;
+}
+
+// 加载规则
+bool CleanupRuleManager::LoadRules ()
+{
+    wstring path = GetRulesPath ();
+    ifstream file (path);
+    if (!file.is_open ())
+    {
+        // 文件不存在，使用默认规则
+        m_rules.clear ();
+        m_nextId = 1;
+        return true;
+    }
+
+    try
+    {
+        json j;
+        file >> j;
+        file.close ();
+
+        m_rules.clear ();
+        m_nextId = 1;
+
+        if (j.contains ("rules") && j["rules"].is_array ())
+        {
+            for (const auto& ruleJson : j["rules"])
+            {
+                CleanupRule rule;
+                rule.id = ruleJson.value ("id", 0);
+                rule.name = utf8_to_wstring (ruleJson.value ("name", ""));
+                rule.enabled = ruleJson.value ("enabled", true);
+                rule.priority = ruleJson.value ("priority", 0);
+                rule.type = (CleanupRuleType)ruleJson.value ("type", 1);
+                rule.days = ruleJson.value ("days", 30);
+                rule.maxRecords = ruleJson.value ("maxRecords", 1000);
+                rule.maxSizeMB = ruleJson.value ("maxSizeMB", 100);
+                rule.deleteImages = ruleJson.value ("deleteImages", true);
+
+                m_rules.push_back (rule);
+
+                if (rule.id >= m_nextId)
+                {
+                    m_nextId = rule.id + 1;
+                }
+            }
+        }
+
+        if (j.contains ("nextId"))
+        {
+            m_nextId = j["nextId"];
+        }
+
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
+// 保存规则
+bool CleanupRuleManager::SaveRules ()
+{
+    wstring path = GetRulesPath ();
+
+    // 确保目录存在
+    wstring dir = m_rootDir + L"\\clips";
+    CreateDirectoryW (dir.c_str (), NULL);
+
+    json j;
+    j["nextId"] = m_nextId;
+
+    json rulesArray = json::array ();
+    for (const auto& rule : m_rules)
+    {
+        json ruleJson;
+        ruleJson["id"] = rule.id;
+        ruleJson["name"] = wstring_to_utf8 (rule.name);
+        ruleJson["enabled"] = rule.enabled;
+        ruleJson["priority"] = rule.priority;
+        ruleJson["type"] = (int)rule.type;
+        ruleJson["days"] = rule.days;
+        ruleJson["maxRecords"] = rule.maxRecords;
+        ruleJson["maxSizeMB"] = rule.maxSizeMB;
+        ruleJson["deleteImages"] = rule.deleteImages;
+        rulesArray.push_back (ruleJson);
+    }
+
+    j["rules"] = rulesArray;
+
+    ofstream file (path);
+    if (!file.is_open ())
+    {
+        return false;
+    }
+
+    file << j.dump (4);
+    file.close ();
+
+    return true;
+}
+
+// 添加规则
+bool CleanupRuleManager::AddRule (CleanupRule rule)
+{
+    rule.id = GenerateRuleId ();
+    rule.priority = (int)m_rules.size ();
+    m_rules.push_back (rule);
+    return SaveRules ();
+}
+
+// 删除规则
+bool CleanupRuleManager::DeleteRule (int ruleId)
+{
+    for (auto it = m_rules.begin (); it != m_rules.end (); ++it)
+    {
+        if (it->id == ruleId)
+        {
+            m_rules.erase (it);
+            // 重新调整优先级
+            for (int i = 0; i < (int)m_rules.size (); i++)
+            {
+                m_rules[i].priority = i;
+            }
+            return SaveRules ();
+        }
+    }
+    return false;
+}
+
+// 更新规则
+bool CleanupRuleManager::UpdateRule (CleanupRule rule)
+{
+    for (auto& existingRule : m_rules)
+    {
+        if (existingRule.id == rule.id)
+        {
+            existingRule.name = rule.name;
+            existingRule.enabled = rule.enabled;
+            existingRule.type = rule.type;
+            existingRule.days = rule.days;
+            existingRule.maxRecords = rule.maxRecords;
+            existingRule.maxSizeMB = rule.maxSizeMB;
+            existingRule.deleteImages = rule.deleteImages;
+            return SaveRules ();
+        }
+    }
+    return false;
+}
+
+// 上移规则
+bool CleanupRuleManager::MoveRuleUp (int ruleId)
+{
+    for (int i = 0; i < (int)m_rules.size (); i++)
+    {
+        if (m_rules[i].id == ruleId && i > 0)
+        {
+            swap (m_rules[i], m_rules[i - 1]);
+            m_rules[i].priority = i;
+            m_rules[i - 1].priority = i - 1;
+            return SaveRules ();
+        }
+    }
+    return false;
+}
+
+// 下移规则
+bool CleanupRuleManager::MoveRuleDown (int ruleId)
+{
+    for (int i = 0; i < (int)m_rules.size (); i++)
+    {
+        if (m_rules[i].id == ruleId && i < (int)m_rules.size () - 1)
+        {
+            swap (m_rules[i], m_rules[i + 1]);
+            m_rules[i].priority = i;
+            m_rules[i + 1].priority = i + 1;
+            return SaveRules ();
+        }
+    }
+    return false;
+}
+
+// 获取所有规则
+vector<CleanupRule> CleanupRuleManager::GetRules ()
+{
+    return m_rules;
+}
+
+// 预览清理效果
+vector<ClipRecord> CleanupRuleManager::PreviewCleanup (const vector<ClipRecord>& records)
+{
+    vector<ClipRecord> toDelete;
+    vector<ClipRecord> remaining = records;
+
+    // 按优先级排序规则
+    vector<CleanupRule> sortedRules = m_rules;
+    sort (sortedRules.begin (), sortedRules.end (), [] (const CleanupRule& a, const CleanupRule& b)
+    {
+        return a.priority < b.priority;
+    });
+
+    // 应用每个规则
+    for (const auto& rule : sortedRules)
+    {
+        if (!rule.enabled)
+        {
+            continue;
+        }
+
+        vector<ClipRecord> ruleRemaining;
+
+        switch (rule.type)
+        {
+        case RULE_BY_TIME:
+        {
+            time_t now = time (NULL);
+            time_t expireTime = now - (rule.days * 24 * 60 * 60);
+            for (const auto& record : remaining)
+            {
+                if (!record.isPinned && record.timestamp < expireTime)
+                {
+                    toDelete.push_back (record);
+                }
+                else
+                {
+                    ruleRemaining.push_back (record);
+                }
+            }
+            remaining = ruleRemaining;
+            break;
+        }
+        case RULE_BY_COUNT:
+        {
+            if ((int)remaining.size () > rule.maxRecords)
+            {
+                // 按时间排序，保留最新的
+                sort (remaining.begin (), remaining.end (), [] (const ClipRecord& a, const ClipRecord& b)
+                {
+                    return a.timestamp > b.timestamp;
+                });
+
+                // 删除超出数量的记录
+                for (int i = rule.maxRecords; i < (int)remaining.size (); i++)
+                {
+                    if (!remaining[i].isPinned)
+                    {
+                        toDelete.push_back (remaining[i]);
+                    }
+                }
+
+                // 保留前maxRecords条
+                if ((int)remaining.size () > rule.maxRecords)
+                {
+                    remaining.resize (rule.maxRecords);
+                }
+            }
+            break;
+        }
+        case RULE_BY_SIZE:
+        {
+            // 计算当前总大小
+            long long totalSize = 0;
+            for (const auto& record : remaining)
+            {
+                if (record.type == CLIP_IMAGE && !record.filePath.empty ())
+                {
+                    // 获取文件大小
+                    WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+                    if (GetFileAttributesExW (record.filePath.c_str (), GetFileExInfoStandard, &fileInfo))
+                    {
+                        totalSize += ((long long)fileInfo.nFileSizeHigh << 32) + fileInfo.nFileSizeLow;
+                    }
+                }
+                else
+                {
+                    // 文字内容大小（估算）
+                    totalSize += record.content.length () * sizeof (wchar_t);
+                }
+            }
+
+            long long maxSizeBytes = (long long)rule.maxSizeMB * 1024 * 1024;
+            if (totalSize > maxSizeBytes)
+            {
+                // 按时间排序，保留最新的
+                sort (remaining.begin (), remaining.end (), [] (const ClipRecord& a, const ClipRecord& b)
+                {
+                    return a.timestamp > b.timestamp;
+                });
+
+                // 删除超出大小的记录
+                long long currentSize = 0;
+                vector<ClipRecord> newRemaining;
+                for (const auto& record : remaining)
+                {
+                    long long recordSize = 0;
+                    if (record.type == CLIP_IMAGE && !record.filePath.empty ())
+                    {
+                        WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+                        if (GetFileAttributesExW (record.filePath.c_str (), GetFileExInfoStandard, &fileInfo))
+                        {
+                            recordSize = ((long long)fileInfo.nFileSizeHigh << 32) + fileInfo.nFileSizeLow;
+                        }
+                    }
+                    else
+                    {
+                        recordSize = record.content.length () * sizeof (wchar_t);
+                    }
+
+                    if (currentSize + recordSize <= maxSizeBytes)
+                    {
+                        newRemaining.push_back (record);
+                        currentSize += recordSize;
+                    }
+                    else if (!record.isPinned)
+                    {
+                        toDelete.push_back (record);
+                    }
+                }
+                remaining = newRemaining;
+            }
+            break;
+        }
+        }
+    }
+
+    return toDelete;
+}
+
+// 执行清理
+int CleanupRuleManager::ExecuteCleanup (vector<ClipRecord>& records)
+{
+    vector<ClipRecord> toDelete = PreviewCleanup (records);
+    int deletedCount = 0;
+
+    for (const auto& deleteRecord : toDelete)
+    {
+        for (auto it = records.begin (); it != records.end (); ++it)
+        {
+            if (it->id == deleteRecord.id)
+            {
+                // 删除图片文件
+                if (it->type == CLIP_IMAGE && !it->filePath.empty ())
+                {
+                    DeleteFileW (it->filePath.c_str ());
+                }
+                records.erase (it);
+                deletedCount++;
+                break;
+            }
+        }
+    }
+
+    return deletedCount;
+}
+
+// Storage 类的清理规则管理器方法
+
+// 获取清理规则管理器
+CleanupRuleManager& Storage::GetCleanupRuleManager ()
+{
+    return m_cleanupRuleManager;
 }
