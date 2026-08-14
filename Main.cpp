@@ -35,7 +35,8 @@ enum PageState
     PAGE_SETTINGS,
     PAGE_VERSION,
     PAGE_FEEDBACK,
-    PAGE_CLEANUP_RULES
+    PAGE_CLEANUP_RULES,
+    PAGE_CLEANUP_PREVIEW
 };
 PageState G_CurrentPage = PAGE_MAIN;
 
@@ -1079,6 +1080,11 @@ void DrawCleanupRulesPage (HDC hdc)
     int addBtnX = G_WindowWidth - 120;
     int addBtnY = G_WindowHeight - 50;
     DrawButton (hdc, addBtnX, addBtnY, 80, 30, L"添加规则", false);
+
+    // 绘制预览按钮
+    int previewBtnX = G_WindowWidth - 210;
+    int previewBtnY = G_WindowHeight - 50;
+    DrawButton (hdc, previewBtnX, previewBtnY, 80, 30, L"预览清理", false);
 }
 
 // 绘制清理规则编辑对话框
@@ -1268,6 +1274,136 @@ void DrawCleanupRuleEditDialog (HDC hdc, const CleanupRule& rule, bool isNew)
     DrawButton (hdc, cancelBtnX, cancelBtnY, 80, 30, L"取消", false);
 
     DeleteObject (labelFont);
+}
+
+// 绘制清理规则预览界面
+void DrawCleanupRulePreviewPage (HDC hdc)
+{
+    // 绘制返回按钮
+    DrawBackButton (hdc, 20, 10, false);
+
+    // 绘制标题
+    SetTextColor (hdc, RGB (33, 33, 33));
+    SetBkMode (hdc, TRANSPARENT);
+    HFONT titleFont = CreateFont (36, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
+    SelectObject (hdc, titleFont);
+    TextOut (hdc, 100, 12, L"清理预览", 4);
+    DeleteObject (titleFont);
+
+    // 绘制分割线
+    HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
+    SelectObject (hdc, linePen);
+    MoveToEx (hdc, 20, 55, NULL);
+    LineTo (hdc, G_WindowWidth - 20, 55);
+    DeleteObject (linePen);
+
+    // 获取清理规则管理器
+    CleanupRuleManager& ruleManager = G_Storage.GetCleanupRuleManager ();
+    vector<ClipRecord>& records = const_cast<vector<ClipRecord>&> (G_ClipManager.GetRecords ());
+    vector<ClipRecord> toDelete = ruleManager.PreviewCleanup (records);
+
+    // 绘制预览信息
+    int contentY = 70;
+    int lineHeight = 40;
+
+    HFONT infoFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
+    SelectObject (hdc, infoFont);
+
+    // 绘制将要清理的记录数量
+    SetTextColor (hdc, RGB (33, 33, 33));
+    wstring countText = L"将要清理 " + to_wstring (toDelete.size ()) + L" 条记录";
+    TextOut (hdc, 20, contentY, countText.c_str (), countText.length ());
+    contentY += lineHeight;
+
+    // 绘制清理后的记录数量
+    wstring remainingText = L"清理后剩余 " + to_wstring (records.size () - toDelete.size ()) + L" 条记录";
+    TextOut (hdc, 20, contentY, remainingText.c_str (), remainingText.length ());
+    contentY += lineHeight;
+
+    // 绘制将要释放的存储空间
+    long long totalSize = 0;
+    for (const auto& record : toDelete)
+    {
+        if (record.type == CLIP_IMAGE && !record.filePath.empty ())
+        {
+            WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+            if (GetFileAttributesExW (record.filePath.c_str (), GetFileExInfoStandard, &fileInfo))
+            {
+                totalSize += ((long long)fileInfo.nFileSizeHigh << 32) + fileInfo.nFileSizeLow;
+            }
+        }
+        else
+        {
+            totalSize += record.content.length () * sizeof (wchar_t);
+        }
+    }
+
+    wstring sizeText = L"将要释放 " + to_wstring (totalSize / 1024) + L" KB 存储空间";
+    TextOut (hdc, 20, contentY, sizeText.c_str (), sizeText.length ());
+    contentY += lineHeight + 20;
+
+    // 绘制将要清理的记录列表
+    SetTextColor (hdc, RGB (100, 100, 100));
+    TextOut (hdc, 20, contentY, L"将要清理的记录:", 8);
+    contentY += 30;
+
+    // 绘制记录列表
+    int listY = contentY;
+    int listHeight = 30;
+    int listMargin = 5;
+
+    for (int i = 0; i < (int)toDelete.size () && i < 10; i++)
+    {
+        const ClipRecord& record = toDelete[i];
+
+        // 绘制记录背景
+        COLORREF bgColor = RGB (255, 255, 255);
+        HBRUSH bgBrush = CreateSolidBrush (bgColor);
+        RECT bgRect = { 20, listY, G_WindowWidth - 20, listY + listHeight };
+        FillRect (hdc, &bgRect, bgBrush);
+        DeleteObject (bgBrush);
+
+        // 绘制记录边框
+        HPEN borderPen = CreatePen (PS_SOLID, 1, RGB (220, 220, 220));
+        SelectObject (hdc, borderPen);
+        Rectangle (hdc, 20, listY, G_WindowWidth - 20, listY + listHeight);
+        DeleteObject (borderPen);
+
+        // 绘制记录预览
+        wstring preview = record.preview;
+        if (preview.length () > 50)
+        {
+            preview = preview.substr (0, 50) + L"...";
+        }
+
+        SetTextColor (hdc, RGB (33, 33, 33));
+        HFONT previewFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
+        SelectObject (hdc, previewFont);
+        TextOut (hdc, 30, listY + 5, preview.c_str (), preview.length ());
+        DeleteObject (previewFont);
+
+        listY += listHeight + listMargin;
+    }
+
+    // 如果超过10条，显示更多提示
+    if (toDelete.size () > 10)
+    {
+        wstring moreText = L"... 还有 " + to_wstring (toDelete.size () - 10) + L" 条记录";
+        SetTextColor (hdc, RGB (150, 150, 150));
+        TextOut (hdc, 30, listY, moreText.c_str (), moreText.length ());
+    }
+
+    // 绘制执行清理按钮
+    int executeBtnX = G_WindowWidth - 200;
+    int executeBtnY = G_WindowHeight - 60;
+    DrawButton (hdc, executeBtnX, executeBtnY, 100, 30, L"执行清理", false);
+
+    // 绘制取消按钮
+    int cancelBtnX = G_WindowWidth - 90;
+    int cancelBtnY = G_WindowHeight - 60;
+    DrawButton (hdc, cancelBtnX, cancelBtnY, 80, 30, L"取消", false);
+
+    DeleteObject (infoFont);
 }
 
 // 绘制复选框
@@ -1724,6 +1860,11 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 DrawCleanupRuleEditDialog (hdc, G_EditingCleanupRule, G_IsNewCleanupRule);
             }
         }
+        else if (G_CurrentPage == PAGE_CLEANUP_PREVIEW)
+        {
+            // 清理规则预览页面
+            DrawCleanupRulePreviewPage (hdc);
+        }
 
         EndPaint (hWnd, &ps);
         return 0;
@@ -2157,6 +2298,17 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 return 0;
             }
 
+            // 检查是否点击了预览按钮
+            int previewBtnX = G_WindowWidth - 210;
+            int previewBtnY = G_WindowHeight - 50;
+            if (x >= previewBtnX && x <= previewBtnX + 80 && y >= previewBtnY && y <= previewBtnY + 30)
+            {
+                // 显示预览页面
+                G_CurrentPage = PAGE_CLEANUP_PREVIEW;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+
             // 检查是否点击了规则列表中的规则
             CleanupRuleManager& ruleManager = G_Storage.GetCleanupRuleManager ();
             vector<CleanupRule> rules = ruleManager.GetRules ();
@@ -2176,6 +2328,52 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     return 0;
                 }
                 ruleY += ruleHeight + ruleMargin;
+            }
+        }
+        else if (G_CurrentPage == PAGE_CLEANUP_PREVIEW)
+        {
+            // 清理规则预览页面点击处理
+
+            // 检查是否点击了返回按钮
+            if (x >= 20 && x <= 80 && y >= 8 && y <= 38)
+            {
+                G_CurrentPage = PAGE_CLEANUP_RULES;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+
+            // 检查是否点击了执行清理按钮
+            int executeBtnX = G_WindowWidth - 200;
+            int executeBtnY = G_WindowHeight - 60;
+            if (x >= executeBtnX && x <= executeBtnX + 100 && y >= executeBtnY && y <= executeBtnY + 30)
+            {
+                // 执行清理
+                CleanupRuleManager& ruleManager = G_Storage.GetCleanupRuleManager ();
+                vector<ClipRecord>& records = const_cast<vector<ClipRecord>&> (G_ClipManager.GetRecords ());
+                int deletedCount = ruleManager.ExecuteCleanup (records);
+
+                // 保存记录
+                G_Storage.SaveRecords (records);
+
+                // 显示提示
+                wstring message = L"已清理 " + to_wstring (deletedCount) + L" 条记录";
+                MessageBoxW (hWnd, message.c_str (), L"清理完成", MB_OK);
+
+                // 返回清理规则页面
+                G_CurrentPage = PAGE_CLEANUP_RULES;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+
+            // 检查是否点击了取消按钮
+            int cancelBtnX = G_WindowWidth - 90;
+            int cancelBtnY = G_WindowHeight - 60;
+            if (x >= cancelBtnX && x <= cancelBtnX + 80 && y >= cancelBtnY && y <= cancelBtnY + 30)
+            {
+                // 返回清理规则页面
+                G_CurrentPage = PAGE_CLEANUP_RULES;
+                InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
             }
         }
 
