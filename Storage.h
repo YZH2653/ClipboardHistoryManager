@@ -9,6 +9,9 @@
 #include "ClipboardManager.h"
 using namespace std;
 
+// 全局变量声明
+extern wstring G_ExeDir;
+
 // 清理规则类型枚举
 enum CleanupRuleType
 {

@@ -40,7 +40,8 @@ static string WstringToUtf8 (const wstring& wstr)
 
 // 全局变量
 static wstring G_WideExeDir = L"";  // 宽字符串形式
-static string G_ExeDir = "";       // UTF-8字符串形式
+wstring G_ExeDir = L"";            // 宽字符串形式（外部可见）
+static string G_ExeDirUtf8 = "";   // UTF-8字符串形式
 static sqlite3* G_Db = NULL;
 
 // 构造函数
@@ -64,7 +65,8 @@ void Storage::SetRootDir (const wstring& rootDir)
 {
     m_rootDir = rootDir;
     G_WideExeDir = GetExeDirW ();
-    G_ExeDir = WstringToUtf8 (G_WideExeDir);
+    G_ExeDir = G_WideExeDir;
+    G_ExeDirUtf8 = WstringToUtf8 (G_WideExeDir);
 
     // 设置清理规则管理器的根目录
     m_cleanupRuleManager.SetRootDir (rootDir);
@@ -75,7 +77,7 @@ bool Storage::Initialize ()
 {
     EnsureDirectories ();
 
-    string dbPath = G_ExeDir + "\\clips\\history.db";
+    string dbPath = G_ExeDirUtf8 + "\\clips\\history.db";
 
     // 打开数据库（如果不存在则创建）
     int rc = sqlite3_open (dbPath.c_str (), &G_Db);
@@ -128,7 +130,7 @@ bool Storage::Initialize ()
 // 确保存储目录存在
 void Storage::EnsureDirectories ()
 {
-    string clipsDir = G_ExeDir + "\\clips";
+    string clipsDir = G_ExeDirUtf8 + "\\clips";
     CreateDirectoryA (clipsDir.c_str (), NULL);
 }
 
@@ -562,7 +564,7 @@ int CleanupRuleManager::GenerateRuleId ()
 bool CleanupRuleManager::LoadRules ()
 {
     wstring path = GetRulesPath ();
-    ifstream file (path);
+    ifstream file (path.c_str ());
     if (!file.is_open ())
     {
         // 文件不存在，使用默认规则
@@ -647,7 +649,7 @@ bool CleanupRuleManager::SaveRules ()
 
     j["rules"] = rulesArray;
 
-    ofstream file (path);
+    ofstream file (path.c_str ());
     if (!file.is_open ())
     {
         return false;
@@ -946,7 +948,7 @@ bool CleanupRuleManager::ExportRules (const wstring& filePath)
 
     j["rules"] = rulesArray;
 
-    ofstream file (filePath);
+    ofstream file (filePath.c_str ());
     if (!file.is_open ())
     {
         return false;
@@ -961,7 +963,7 @@ bool CleanupRuleManager::ExportRules (const wstring& filePath)
 // 从JSON文件导入规则
 bool CleanupRuleManager::ImportRules (const wstring& filePath)
 {
-    ifstream file (filePath);
+    ifstream file (filePath.c_str ());
     if (!file.is_open ())
     {
         return false;

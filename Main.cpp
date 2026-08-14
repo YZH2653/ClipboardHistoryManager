@@ -1097,6 +1097,45 @@ void DrawCleanupRulesPage (HDC hdc)
     DrawButton (hdc, importBtnX, importBtnY, 80, 30, L"导入规则", false);
 }
 
+// 绘制复选框
+void DrawCheckbox (HDC hdc, int x, int y, int size, bool checked, bool hovered)
+{
+    // 绘制复选框背景
+    COLORREF bgColor = hovered ? RGB (240, 240, 240) : RGB (255, 255, 255);
+    HBRUSH bgBrush = CreateSolidBrush (bgColor);
+    RECT bgRect = { x, y, x + size, y + size };
+    FillRect (hdc, &bgRect, bgBrush);
+    DeleteObject (bgBrush);
+
+    // 绘制边框
+    COLORREF borderColor = checked ? RGB (100, 149, 237) : RGB (180, 180, 180);
+    HPEN borderPen = CreatePen (PS_SOLID, 2, borderColor);
+    SelectObject (hdc, borderPen);
+    Rectangle (hdc, x, y, x + size, y + size);
+    DeleteObject (borderPen);
+
+    // 如果选中，绘制勾选标记
+    if (checked)
+    {
+        HPEN checkPen = CreatePen (PS_SOLID, 2, RGB (100, 149, 237));
+        SelectObject (hdc, checkPen);
+
+        // 绘制勾选标记
+        int startX = x + 4;
+        int startY = y + size / 2;
+        int midX = x + size / 3;
+        int midY = y + size - 4;
+        int endX = x + size - 4;
+        int endY = y + 4;
+
+        MoveToEx (hdc, startX, startY, NULL);
+        LineTo (hdc, midX, midY);
+        LineTo (hdc, endX, endY);
+
+        DeleteObject (checkPen);
+    }
+}
+
 // 绘制清理规则编辑对话框
 void DrawCleanupRuleEditDialog (HDC hdc, const CleanupRule& rule, bool isNew)
 {
@@ -1414,45 +1453,6 @@ void DrawCleanupRulePreviewPage (HDC hdc)
     DrawButton (hdc, cancelBtnX, cancelBtnY, 80, 30, L"取消", false);
 
     DeleteObject (infoFont);
-}
-
-// 绘制复选框
-void DrawCheckbox (HDC hdc, int x, int y, int size, bool checked, bool hovered)
-{
-    // 绘制复选框背景
-    COLORREF bgColor = hovered ? RGB (240, 240, 240) : RGB (255, 255, 255);
-    HBRUSH bgBrush = CreateSolidBrush (bgColor);
-    RECT bgRect = { x, y, x + size, y + size };
-    FillRect (hdc, &bgRect, bgBrush);
-    DeleteObject (bgBrush);
-
-    // 绘制边框
-    COLORREF borderColor = checked ? RGB (100, 149, 237) : RGB (180, 180, 180);
-    HPEN borderPen = CreatePen (PS_SOLID, 2, borderColor);
-    SelectObject (hdc, borderPen);
-    Rectangle (hdc, x, y, x + size, y + size);
-    DeleteObject (borderPen);
-
-    // 如果选中，绘制勾选标记
-    if (checked)
-    {
-        HPEN checkPen = CreatePen (PS_SOLID, 2, RGB (100, 149, 237));
-        SelectObject (hdc, checkPen);
-
-        // 绘制勾选标记
-        int startX = x + 4;
-        int startY = y + size / 2;
-        int midX = x + size / 3;
-        int midY = y + size - 4;
-        int endX = x + size - 4;
-        int endY = y + 4;
-
-        MoveToEx (hdc, startX, startY, NULL);
-        LineTo (hdc, midX, midY);
-        LineTo (hdc, endX, endY);
-
-        DeleteObject (checkPen);
-    }
 }
 
 // 绘制卡片
