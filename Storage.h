@@ -71,6 +71,12 @@ public:
     // 执行清理
     int ExecuteCleanup (vector<ClipRecord>& records);
 
+    // 导出规则到JSON文件
+    bool ExportRules (const wstring& filePath);
+
+    // 从JSON文件导入规则
+    bool ImportRules (const wstring& filePath);
+
 private:
     // 获取规则配置文件路径
     wstring GetRulesPath ();

@@ -1085,6 +1085,16 @@ void DrawCleanupRulesPage (HDC hdc)
     int previewBtnX = G_WindowWidth - 210;
     int previewBtnY = G_WindowHeight - 50;
     DrawButton (hdc, previewBtnX, previewBtnY, 80, 30, L"预览清理", false);
+
+    // 绘制导出按钮
+    int exportBtnX = 20;
+    int exportBtnY = G_WindowHeight - 50;
+    DrawButton (hdc, exportBtnX, exportBtnY, 80, 30, L"导出规则", false);
+
+    // 绘制导入按钮
+    int importBtnX = 110;
+    int importBtnY = G_WindowHeight - 50;
+    DrawButton (hdc, importBtnX, importBtnY, 80, 30, L"导入规则", false);
 }
 
 // 绘制清理规则编辑对话框
@@ -2306,6 +2316,45 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 // 显示预览页面
                 G_CurrentPage = PAGE_CLEANUP_PREVIEW;
                 InvalidateRect (hWnd, NULL, TRUE);
+                return 0;
+            }
+
+            // 检查是否点击了导出按钮
+            int exportBtnX = 20;
+            int exportBtnY = G_WindowHeight - 50;
+            if (x >= exportBtnX && x <= exportBtnX + 80 && y >= exportBtnY && y <= exportBtnY + 30)
+            {
+                // 导出规则
+                CleanupRuleManager& ruleManager = G_Storage.GetCleanupRuleManager ();
+                wstring exportPath = G_ExeDir + L"\\clips\\cleanup_rules_export.json";
+                if (ruleManager.ExportRules (exportPath))
+                {
+                    MessageBoxW (hWnd, L"规则导出成功", L"导出完成", MB_OK);
+                }
+                else
+                {
+                    MessageBoxW (hWnd, L"规则导出失败", L"导出失败", MB_OK);
+                }
+                return 0;
+            }
+
+            // 检查是否点击了导入按钮
+            int importBtnX = 110;
+            int importBtnY = G_WindowHeight - 50;
+            if (x >= importBtnX && x <= importBtnX + 80 && y >= importBtnY && y <= importBtnY + 30)
+            {
+                // 导入规则
+                CleanupRuleManager& ruleManager = G_Storage.GetCleanupRuleManager ();
+                wstring importPath = G_ExeDir + L"\\clips\\cleanup_rules_export.json";
+                if (ruleManager.ImportRules (importPath))
+                {
+                    MessageBoxW (hWnd, L"规则导入成功", L"导入完成", MB_OK);
+                    InvalidateRect (hWnd, NULL, TRUE);
+                }
+                else
+                {
+                    MessageBoxW (hWnd, L"规则导入失败", L"导入失败", MB_OK);
+                }
                 return 0;
             }
 
