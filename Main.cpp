@@ -64,6 +64,11 @@ bool G_SelectMode = false;  // 是否进入选择模式
 bool G_SelectAll = false;   // 全选状态
 vector<int> G_SelectedItems;  // 选中的记录ID列表
 
+// 清理规则编辑状态
+bool G_ShowCleanupRuleEditDialog = false;  // 是否显示编辑对话框
+CleanupRule G_EditingCleanupRule;          // 当前正在编辑的规则
+bool G_IsNewCleanupRule = false;           // 是否是新规则
+
 // 窗口尺寸
 int G_WindowWidth = 800;
 int G_WindowHeight = 600;
@@ -1076,6 +1081,195 @@ void DrawCleanupRulesPage (HDC hdc)
     DrawButton (hdc, addBtnX, addBtnY, 80, 30, L"添加规则", false);
 }
 
+// 绘制清理规则编辑对话框
+void DrawCleanupRuleEditDialog (HDC hdc, const CleanupRule& rule, bool isNew)
+{
+    // 绘制对话框背景
+    COLORREF bgColor = RGB (255, 255, 255);
+    HBRUSH bgBrush = CreateSolidBrush (bgColor);
+    RECT bgRect = { 50, 50, G_WindowWidth - 50, G_WindowHeight - 50 };
+    FillRect (hdc, &bgRect, bgBrush);
+    DeleteObject (bgBrush);
+
+    // 绘制边框
+    HPEN borderPen = CreatePen (PS_SOLID, 2, RGB (100, 149, 237));
+    SelectObject (hdc, borderPen);
+    Rectangle (hdc, 50, 50, G_WindowWidth - 50, G_WindowHeight - 50);
+    DeleteObject (borderPen);
+
+    // 绘制标题
+    SetTextColor (hdc, RGB (33, 33, 33));
+    SetBkMode (hdc, TRANSPARENT);
+    HFONT titleFont = CreateFont (28, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
+    SelectObject (hdc, titleFont);
+    wstring title = isNew ? L"添加清理规则" : L"编辑清理规则";
+    TextOut (hdc, 70, 70, title.c_str (), title.length ());
+    DeleteObject (titleFont);
+
+    // 绘制分割线
+    HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
+    SelectObject (hdc, linePen);
+    MoveToEx (hdc, 50, 110, NULL);
+    LineTo (hdc, G_WindowWidth - 50, 110);
+    DeleteObject (linePen);
+
+    // 绘制规则名称标签
+    HFONT labelFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
+    SelectObject (hdc, labelFont);
+    SetTextColor (hdc, RGB (100, 100, 100));
+    TextOut (hdc, 70, 130, L"规则名称:", 5);
+
+    // 绘制规则名称输入框
+    int inputX = 180;
+    int inputY = 125;
+    int inputWidth = G_WindowWidth - 250;
+    int inputHeight = 30;
+
+    COLORREF inputBgColor = RGB (255, 255, 255);
+    HBRUSH inputBgBrush = CreateSolidBrush (inputBgColor);
+    RECT inputRect = { inputX, inputY, inputX + inputWidth, inputY + inputHeight };
+    FillRect (hdc, &inputRect, inputBgBrush);
+    DeleteObject (inputBgBrush);
+
+    HPEN inputBorderPen = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
+    SelectObject (hdc, inputBorderPen);
+    Rectangle (hdc, inputX, inputY, inputX + inputWidth, inputY + inputHeight);
+    DeleteObject (inputBorderPen);
+
+    // 绘制规则名称文本
+    SetTextColor (hdc, RGB (33, 33, 33));
+    TextOut (hdc, inputX + 10, inputY + 5, rule.name.c_str (), rule.name.length ());
+
+    // 绘制规则类型标签
+    SetTextColor (hdc, RGB (100, 100, 100));
+    TextOut (hdc, 70, 180, L"规则类型:", 5);
+
+    // 绘制规则类型下拉框
+    int dropdownX = 180;
+    int dropdownY = 175;
+    int dropdownWidth = 200;
+    int dropdownHeight = 30;
+
+    COLORREF dropdownBgColor = RGB (255, 255, 255);
+    HBRUSH dropdownBgBrush = CreateSolidBrush (dropdownBgColor);
+    RECT dropdownRect = { dropdownX, dropdownY, dropdownX + dropdownWidth, dropdownY + dropdownHeight };
+    FillRect (hdc, &dropdownRect, dropdownBgBrush);
+    DeleteObject (dropdownBgBrush);
+
+    HPEN dropdownBorderPen = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
+    SelectObject (hdc, dropdownBorderPen);
+    Rectangle (hdc, dropdownX, dropdownY, dropdownX + dropdownWidth, dropdownY + dropdownHeight);
+    DeleteObject (dropdownBorderPen);
+
+    // 绘制规则类型文本
+    wstring typeText;
+    switch (rule.type)
+    {
+    case RULE_BY_TIME:
+        typeText = L"按时间清理";
+        break;
+    case RULE_BY_COUNT:
+        typeText = L"按数量清理";
+        break;
+    case RULE_BY_SIZE:
+        typeText = L"按大小清理";
+        break;
+    }
+
+    SetTextColor (hdc, RGB (33, 33, 33));
+    TextOut (hdc, dropdownX + 10, dropdownY + 5, typeText.c_str (), typeText.length ());
+
+    // 绘制下拉箭头
+    SetTextColor (hdc, RGB (100, 100, 100));
+    TextOut (hdc, dropdownX + dropdownWidth - 25, dropdownY + 5, L"▼", 1);
+
+    // 绘制规则参数标签
+    SetTextColor (hdc, RGB (100, 100, 100));
+    TextOut (hdc, 70, 230, L"规则参数:", 5);
+
+    // 绘制规则参数输入框
+    int paramX = 180;
+    int paramY = 225;
+    int paramWidth = 150;
+    int paramHeight = 30;
+
+    COLORREF paramBgColor = RGB (255, 255, 255);
+    HBRUSH paramBgBrush = CreateSolidBrush (paramBgColor);
+    RECT paramRect = { paramX, paramY, paramX + paramWidth, paramY + paramHeight };
+    FillRect (hdc, &paramRect, paramBgBrush);
+    DeleteObject (paramBgBrush);
+
+    HPEN paramBorderPen = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
+    SelectObject (hdc, paramBorderPen);
+    Rectangle (hdc, paramX, paramY, paramX + paramWidth, paramY + paramHeight);
+    DeleteObject (paramBorderPen);
+
+    // 绘制规则参数文本
+    wstring paramText;
+    switch (rule.type)
+    {
+    case RULE_BY_TIME:
+        paramText = to_wstring (rule.days);
+        break;
+    case RULE_BY_COUNT:
+        paramText = to_wstring (rule.maxRecords);
+        break;
+    case RULE_BY_SIZE:
+        paramText = to_wstring (rule.maxSizeMB);
+        break;
+    }
+
+    SetTextColor (hdc, RGB (33, 33, 33));
+    TextOut (hdc, paramX + 10, paramY + 5, paramText.c_str (), paramText.length ());
+
+    // 绘制参数单位标签
+    wstring unitText;
+    switch (rule.type)
+    {
+    case RULE_BY_TIME:
+        unitText = L"天";
+        break;
+    case RULE_BY_COUNT:
+        unitText = L"条";
+        break;
+    case RULE_BY_SIZE:
+        unitText = L"MB";
+        break;
+    }
+
+    SetTextColor (hdc, RGB (100, 100, 100));
+    TextOut (hdc, paramX + paramWidth + 10, paramY + 5, unitText.c_str (), unitText.length ());
+
+    // 绘制启用/禁用复选框
+    SetTextColor (hdc, RGB (100, 100, 100));
+    TextOut (hdc, 70, 280, L"启用规则:", 5);
+
+    int checkboxX = 180;
+    int checkboxY = 275;
+    int checkboxSize = 20;
+    DrawCheckbox (hdc, checkboxX, checkboxY, checkboxSize, rule.enabled, false);
+
+    // 绘制删除图片复选框
+    SetTextColor (hdc, RGB (100, 100, 100));
+    TextOut (hdc, 70, 320, L"删除图片:", 5);
+
+    int deleteImgCheckboxX = 180;
+    int deleteImgCheckboxY = 315;
+    DrawCheckbox (hdc, deleteImgCheckboxX, deleteImgCheckboxY, checkboxSize, rule.deleteImages, false);
+
+    // 绘制保存按钮
+    int saveBtnX = G_WindowWidth - 200;
+    int saveBtnY = G_WindowHeight - 100;
+    DrawButton (hdc, saveBtnX, saveBtnY, 80, 30, L"保存", false);
+
+    // 绘制取消按钮
+    int cancelBtnX = G_WindowWidth - 110;
+    int cancelBtnY = G_WindowHeight - 100;
+    DrawButton (hdc, cancelBtnX, cancelBtnY, 80, 30, L"取消", false);
+
+    DeleteObject (labelFont);
+}
+
 // 绘制复选框
 void DrawCheckbox (HDC hdc, int x, int y, int size, bool checked, bool hovered)
 {
@@ -1523,6 +1717,12 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             // 清理规则管理页面
             DrawCleanupRulesPage (hdc);
+
+            // 如果显示编辑对话框，绘制编辑对话框
+            if (G_ShowCleanupRuleEditDialog)
+            {
+                DrawCleanupRuleEditDialog (hdc, G_EditingCleanupRule, G_IsNewCleanupRule);
+            }
         }
 
         EndPaint (hWnd, &ps);
@@ -1871,6 +2071,64 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             // 清理规则管理页面点击处理
 
+            // 如果显示编辑对话框，处理编辑对话框的点击
+            if (G_ShowCleanupRuleEditDialog)
+            {
+                // 检查是否点击了取消按钮
+                int cancelBtnX = G_WindowWidth - 110;
+                int cancelBtnY = G_WindowHeight - 100;
+                if (x >= cancelBtnX && x <= cancelBtnX + 80 && y >= cancelBtnY && y <= cancelBtnY + 30)
+                {
+                    G_ShowCleanupRuleEditDialog = false;
+                    InvalidateRect (hWnd, NULL, TRUE);
+                    return 0;
+                }
+
+                // 检查是否点击了保存按钮
+                int saveBtnX = G_WindowWidth - 200;
+                int saveBtnY = G_WindowHeight - 100;
+                if (x >= saveBtnX && x <= saveBtnX + 80 && y >= saveBtnY && y <= saveBtnY + 30)
+                {
+                    // 保存规则
+                    CleanupRuleManager& ruleManager = G_Storage.GetCleanupRuleManager ();
+                    if (G_IsNewCleanupRule)
+                    {
+                        ruleManager.AddRule (G_EditingCleanupRule);
+                    }
+                    else
+                    {
+                        ruleManager.UpdateRule (G_EditingCleanupRule);
+                    }
+
+                    G_ShowCleanupRuleEditDialog = false;
+                    InvalidateRect (hWnd, NULL, TRUE);
+                    return 0;
+                }
+
+                // 检查是否点击了启用/禁用复选框
+                int checkboxX = 180;
+                int checkboxY = 275;
+                int checkboxSize = 20;
+                if (x >= checkboxX && x <= checkboxX + checkboxSize && y >= checkboxY && y <= checkboxY + checkboxSize)
+                {
+                    G_EditingCleanupRule.enabled = !G_EditingCleanupRule.enabled;
+                    InvalidateRect (hWnd, NULL, TRUE);
+                    return 0;
+                }
+
+                // 检查是否点击了删除图片复选框
+                int deleteImgCheckboxX = 180;
+                int deleteImgCheckboxY = 315;
+                if (x >= deleteImgCheckboxX && x <= deleteImgCheckboxX + checkboxSize && y >= deleteImgCheckboxY && y <= deleteImgCheckboxY + checkboxSize)
+                {
+                    G_EditingCleanupRule.deleteImages = !G_EditingCleanupRule.deleteImages;
+                    InvalidateRect (hWnd, NULL, TRUE);
+                    return 0;
+                }
+
+                return 0;
+            }
+
             // 检查是否点击了返回按钮
             if (x >= 20 && x <= 80 && y >= 8 && y <= 38)
             {
@@ -1884,9 +2142,40 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             int addBtnY = G_WindowHeight - 50;
             if (x >= addBtnX && x <= addBtnX + 80 && y >= addBtnY && y <= addBtnY + 30)
             {
-                // TODO: 添加规则对话框
-                MessageBoxW (hWnd, L"添加规则功能即将实现", L"提示", MB_OK);
+                // 显示添加规则对话框
+                G_EditingCleanupRule = CleanupRule ();
+                G_EditingCleanupRule.name = L"新规则";
+                G_EditingCleanupRule.enabled = true;
+                G_EditingCleanupRule.type = RULE_BY_TIME;
+                G_EditingCleanupRule.days = 30;
+                G_EditingCleanupRule.maxRecords = 1000;
+                G_EditingCleanupRule.maxSizeMB = 100;
+                G_EditingCleanupRule.deleteImages = true;
+                G_IsNewCleanupRule = true;
+                G_ShowCleanupRuleEditDialog = true;
+                InvalidateRect (hWnd, NULL, TRUE);
                 return 0;
+            }
+
+            // 检查是否点击了规则列表中的规则
+            CleanupRuleManager& ruleManager = G_Storage.GetCleanupRuleManager ();
+            vector<CleanupRule> rules = ruleManager.GetRules ();
+            int ruleY = 70;
+            int ruleHeight = 80;
+            int ruleMargin = 10;
+
+            for (int i = 0; i < (int)rules.size (); i++)
+            {
+                if (x >= 20 && x <= G_WindowWidth - 20 && y >= ruleY && y < ruleY + ruleHeight)
+                {
+                    // 显示编辑规则对话框
+                    G_EditingCleanupRule = rules[i];
+                    G_IsNewCleanupRule = false;
+                    G_ShowCleanupRuleEditDialog = true;
+                    InvalidateRect (hWnd, NULL, TRUE);
+                    return 0;
+                }
+                ruleY += ruleHeight + ruleMargin;
             }
         }
 
