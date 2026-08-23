@@ -1756,8 +1756,13 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint (hWnd, &ps);
 
-        // 绘制背景
-        FillRect (hdc, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW + 1));
+        // 双缓冲：创建内存 DC 和位图
+        HDC memDC = CreateCompatibleDC (hdc);
+        HBITMAP memBitmap = CreateCompatibleBitmap (hdc, G_WindowWidth, G_WindowHeight);
+        HBITMAP oldBitmap = (HBITMAP)SelectObject (memDC, memBitmap);
+
+        // 在内存 DC 上绘制背景
+        FillRect (memDC, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW + 1));
 
         if (G_CurrentPage == PAGE_MAIN)
         {
@@ -1767,29 +1772,25 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             int searchWidth = contentWidth;
             int cardWidth = contentWidth;
 
-            // 绘制标题
-            SetTextColor (hdc, RGB (33, 33, 33));
-            SetBkMode (hdc, TRANSPARENT);
-            HFONT titleFont = CreateFont (32, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-            SelectObject (hdc, titleFont);
-            TextOut (hdc, 20, 12, L"历史剪贴板管理器", 8);
-            DeleteObject (titleFont);
+            // 绘制标题（使用缓存字体）
+            SetTextColor (memDC, RGB (33, 33, 33));
+            SetBkMode (memDC, TRANSPARENT);
+            SelectObject (memDC, G_GDICache.fontTitle);
+            TextOut (memDC, 20, 12, L"历史剪贴板管理器", 8);
 
             // 绘制设置按钮
-            DrawSettingsButton (hdc, G_WindowWidth - 52, 10, false);
+            DrawSettingsButton (memDC, G_WindowWidth - 52, 10, false);
 
             // 绘制垃圾桶按钮（选择模式切换）
-            DrawDeleteModeButton (hdc, G_WindowWidth - 92, 10, false, G_SelectMode);
+            DrawDeleteModeButton (memDC, G_WindowWidth - 92, 10, false, G_SelectMode);
 
             // 绘制搜索框
-            DrawSearchBox (hdc, 20, 50, searchWidth);
+            DrawSearchBox (memDC, 20, 50, searchWidth);
 
-            // 绘制分割线
-            HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
-            SelectObject (hdc, linePen);
-            MoveToEx (hdc, 20, 100, NULL);
-            LineTo (hdc, 20 + searchWidth, 100);
-            DeleteObject (linePen);
+            // 绘制分割线（使用缓存画笔）
+            SelectObject (memDC, G_GDICache.penDivider);
+            MoveToEx (memDC, 20, 100, NULL);
+            LineTo (memDC, 20 + searchWidth, 100);
 
             // 绘制全选复选框和批量删除按钮（在选择模式下）
             vector<ClipRecord> records = GetFilteredRecords ();
@@ -1799,29 +1800,24 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 int checkboxSize = 20;
                 int checkboxX = 20;
                 int checkboxY = 105;
-                DrawCheckbox (hdc, checkboxX, checkboxY, checkboxSize, G_SelectAll, false);
+                DrawCheckbox (memDC, checkboxX, checkboxY, checkboxSize, G_SelectAll, false);
 
-                // 绘制全选文字
-                SetTextColor (hdc, RGB (33, 33, 33));
-                SetBkMode (hdc, TRANSPARENT);
-                HFONT selectFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-                SelectObject (hdc, selectFont);
-                TextOut (hdc, checkboxX + 25, checkboxY + 2, L"全选", 2);
-                DeleteObject (selectFont);
+                // 绘制全选文字（使用缓存字体）
+                SetTextColor (memDC, RGB (33, 33, 33));
+                SetBkMode (memDC, TRANSPARENT);
+                SelectObject (memDC, G_GDICache.fontButton);
+                TextOut (memDC, checkboxX + 25, checkboxY + 2, L"全选", 2);
 
                 // 绘制选中计数
                 wstring countText = L"已选中 " + to_wstring (G_SelectedItems.size ()) + L" 条";
-                HFONT countFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-                SelectObject (hdc, countFont);
-                SetTextColor (hdc, RGB (100, 100, 100));
-                TextOut (hdc, checkboxX + 80, checkboxY + 2, countText.c_str (), countText.length ());
-                DeleteObject (countFont);
+                SetTextColor (memDC, RGB (100, 100, 100));
+                TextOut (memDC, checkboxX + 80, checkboxY + 2, countText.c_str (), countText.length ());
 
                 // 绘制批量删除按钮
                 int deleteBtnX = G_WindowWidth - 120;
                 int deleteBtnY = checkboxY;
                 bool hasSelected = !G_SelectedItems.empty ();
-                DrawButton (hdc, deleteBtnX, deleteBtnY, 80, 26, L"删除选中", !hasSelected);
+                DrawButton (memDC, deleteBtnX, deleteBtnY, 80, 26, L"删除选中", !hasSelected);
             }
 
             // 绘制历史记录列表
@@ -1847,52 +1843,58 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 // 绘制卡片
                 bool isHovered = (i == G_HoverIndex);
                 bool isSelected = IsItemSelected (records[i].id);
-                DrawCard (hdc, 20, cardY, cardWidth, records[i], isHovered, isSelected);
+                DrawCard (memDC, 20, cardY, cardWidth, records[i], isHovered, isSelected);
                 cardY += cardHeight + cardMargin;
             }
 
             // 如果没有记录，显示提示
             if (records.empty ())
             {
-                HFONT hintFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-                SelectObject (hdc, hintFont);
-                SetTextColor (hdc, RGB (150, 150, 150));
+                SelectObject (memDC, G_GDICache.fontContent);
+                SetTextColor (memDC, RGB (150, 150, 150));
                 wstring hintText = G_SearchText.empty () ? L"暂无历史记录，请复制内容测试" : L"未找到匹配的记录";
-                TextOut (hdc, G_WindowWidth / 2 - 150, G_WindowHeight / 2, hintText.c_str (), hintText.length ());
-                DeleteObject (hintFont);
+                TextOut (memDC, G_WindowWidth / 2 - 150, G_WindowHeight / 2, hintText.c_str (), hintText.length ());
             }
         }
         else if (G_CurrentPage == PAGE_SETTINGS)
         {
             // 设置页面
-            DrawSettingsPage (hdc);
+            DrawSettingsPage (memDC);
         }
         else if (G_CurrentPage == PAGE_VERSION)
         {
             // 版本号页面
-            DrawVersionPage (hdc);
+            DrawVersionPage (memDC);
         }
         else if (G_CurrentPage == PAGE_FEEDBACK)
         {
             // 问题反馈页面
-            DrawFeedbackPage (hdc);
+            DrawFeedbackPage (memDC);
         }
         else if (G_CurrentPage == PAGE_CLEANUP_RULES)
         {
             // 清理规则管理页面
-            DrawCleanupRulesPage (hdc);
+            DrawCleanupRulesPage (memDC);
 
             // 如果显示编辑对话框，绘制编辑对话框
             if (G_ShowCleanupRuleEditDialog)
             {
-                DrawCleanupRuleEditDialog (hdc, G_EditingCleanupRule, G_IsNewCleanupRule);
+                DrawCleanupRuleEditDialog (memDC, G_EditingCleanupRule, G_IsNewCleanupRule);
             }
         }
         else if (G_CurrentPage == PAGE_CLEANUP_PREVIEW)
         {
             // 清理规则预览页面
-            DrawCleanupRulePreviewPage (hdc);
+            DrawCleanupRulePreviewPage (memDC);
         }
+
+        // 双缓冲：将内存 DC 内容拷贝到屏幕
+        BitBlt (hdc, 0, 0, G_WindowWidth, G_WindowHeight, memDC, 0, 0, SRCCOPY);
+
+        // 清理双缓冲资源
+        SelectObject (memDC, oldBitmap);
+        DeleteObject (memBitmap);
+        DeleteDC (memDC);
 
         EndPaint (hWnd, &ps);
         return 0;
