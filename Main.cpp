@@ -320,18 +320,47 @@ bool MatchTimeFilter (const wstring& searchText, time_t timestamp)
 }
 
 // 获取筛选后的记录（置顶优先，时间倒序）
+// 筛选结果缓存
+struct RecordCache
+{
+    vector<ClipRecord> filteredRecords;
+    wstring lastSearchText;
+    int lastRecordCount;
+    bool isValid;
+
+    RecordCache () : lastRecordCount (0), isValid (false) {}
+
+    void Invalidate ()
+    {
+        isValid = false;
+    }
+};
+RecordCache G_RecordCache;
+
+// 获取筛选后的记录（带缓存）
 vector<ClipRecord> GetFilteredRecords ()
 {
-    vector<ClipRecord> result;
     const vector<ClipRecord>& allRecords = G_ClipManager.GetRecords ();
+    int currentCount = (int)allRecords.size ();
+
+    // 检查缓存是否有效
+    if (G_RecordCache.isValid
+        && G_RecordCache.lastSearchText == G_SearchText
+        && G_RecordCache.lastRecordCount == currentCount)
+    {
+        return G_RecordCache.filteredRecords;
+    }
+
+    // 缓存失效，重新计算
+    vector<ClipRecord> result;
+    result.reserve (currentCount);
 
     for (const auto& record : allRecords)
     {
         // 搜索过滤
         if (!G_SearchText.empty ())
         {
-            bool textMatch = (record.preview.find (G_SearchText) != wstring::npos ||
-                             record.content.find (G_SearchText) != wstring::npos);
+            bool textMatch = (record.content.find (G_SearchText) != wstring::npos);
             bool timeMatch = MatchTimeFilter (G_SearchText, record.timestamp);
 
             // 文字搜索或时间搜索
@@ -353,7 +382,13 @@ vector<ClipRecord> GetFilteredRecords ()
         return a.timestamp > b.timestamp;
     });
 
-    return result;
+    // 更新缓存
+    G_RecordCache.filteredRecords = result;
+    G_RecordCache.lastSearchText = G_SearchText;
+    G_RecordCache.lastRecordCount = currentCount;
+    G_RecordCache.isValid = true;
+
+    return G_RecordCache.filteredRecords;
 }
 
 // 字体缓存
@@ -1632,7 +1667,8 @@ void BatchDeleteSelected (HWND hWnd)
         G_SelectAll = false;
         G_SelectMode = false;
 
-        // 刷新界面
+        // 使缓存失效并刷新界面
+        G_RecordCache.Invalidate ();
         InvalidateRect (hWnd, NULL, TRUE);
     }
 }
@@ -1745,6 +1781,9 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         // 保存记录到文件
         G_Storage.SaveRecords (records);
+
+        // 使缓存失效
+        G_RecordCache.Invalidate ();
 
         // 刷新窗口显示
         InvalidateRect (hWnd, NULL, TRUE);
@@ -2049,6 +2088,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                             }
                         }
                         G_Storage.SaveRecords (allRecords);
+                        G_RecordCache.Invalidate ();
                         InvalidateRect (hWnd, NULL, TRUE);
                         return 0;
                     }
@@ -2068,6 +2108,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                             }
                         }
                         G_Storage.SaveRecords (allRecords);
+                        G_RecordCache.Invalidate ();
                         InvalidateRect (hWnd, NULL, TRUE);
                         return 0;
                     }
@@ -2384,6 +2425,7 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 // 保存记录
                 G_Storage.SaveRecords (records);
+                G_RecordCache.Invalidate ();
 
                 // 显示提示
                 wstring message = L"已清理 " + to_wstring (deletedCount) + L" 条记录";
