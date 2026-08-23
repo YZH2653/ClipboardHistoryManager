@@ -22,7 +22,7 @@ ClipboardManager G_ClipManager;
 Storage G_Storage;
 
 // 版本号
-const wchar_t* APP_VERSION = L"1.7.0.0";
+const wchar_t* APP_VERSION = L"1.8.0.0";
 const wchar_t* APP_UPDATE_DATE = L"2026-08-14";
 const wchar_t* APP_AUTHOR = L"YZH2653";
 const wchar_t* APP_AUTHOR_EMAIL = L"yzh2653@163.com";
@@ -960,15 +960,15 @@ void DrawVersionPage (HDC hdc)
 
     // 更新内容列表
     SetTextColor (hdc, RGB (33, 33, 33));
-    TextOut (hdc, 40, contentY, L"• 新增自动清理规则功能", 10);
+    TextOut (hdc, 40, contentY, L"• GDI对象缓存，减少创建销毁开销", 10);
     contentY += 35;
-    TextOut (hdc, 40, contentY, L"• 支持按时间、数量、大小清理", 10);
+    TextOut (hdc, 40, contentY, L"• 双缓冲绘制，消除界面闪烁", 10);
     contentY += 35;
-    TextOut (hdc, 40, contentY, L"• 支持多个清理规则优先级", 9);
+    TextOut (hdc, 40, contentY, L"• 筛选结果缓存，提升响应速度", 9);
     contentY += 35;
-    TextOut (hdc, 40, contentY, L"• 支持规则预览功能", 8);
+    TextOut (hdc, 40, contentY, L"• 优化搜索逻辑，提升流畅性", 8);
     contentY += 35;
-    TextOut (hdc, 40, contentY, L"• 更新版本号到1.7.0.0", 8);
+    TextOut (hdc, 40, contentY, L"• 更新版本号到1.8.0.0", 8);
     contentY += lineHeight + 20;
 
     // 作者
