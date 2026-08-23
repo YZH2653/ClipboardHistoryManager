@@ -79,6 +79,89 @@ NOTIFYICONDATA G_Nid = {};
 bool G_TrayIconAdded = false;
 bool G_IsMinimizedToTray = false;
 
+// 前向声明
+static wstring GetAvailableFont ();
+
+// GDI 对象缓存
+struct GDICache
+{
+    // 字体缓存
+    HFONT fontTitle;        // 标题字体 (36px Bold)
+    HFONT fontSection;      // 段落字体 (26px)
+    HFONT fontContent;      // 内容字体 (24px)
+    HFONT fontButton;       // 按钮字体 (18px)
+    HFONT fontSmall;        // 小字体 (16px)
+
+    // 画刷缓存
+    HBRUSH brushWhite;      // 白色背景
+    HBRUSH brushLightGray;  // 浅灰背景
+    HBRUSH brushHover;      // 悬停背景
+    HBRUSH brushHighlight;  // 高亮背景
+
+    // 画笔缓存
+    HPEN penBorder;         // 边框画笔
+    HPEN penDivider;        // 分割线画笔
+    HPEN penHighlight;      // 高亮画笔
+
+    // 初始化所有缓存对象
+    void Initialize ()
+    {
+        wstring fontName = GetAvailableFont ();
+        const wchar_t* fn = fontName.c_str ();
+
+        // 创建字体
+        fontTitle = CreateFont (36, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            DEFAULT_QUALITY, DEFAULT_PITCH, fn);
+        fontSection = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            DEFAULT_QUALITY, DEFAULT_PITCH, fn);
+        fontContent = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            DEFAULT_QUALITY, DEFAULT_PITCH, fn);
+        fontButton = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            DEFAULT_QUALITY, DEFAULT_PITCH, fn);
+        fontSmall = CreateFont (16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            DEFAULT_QUALITY, DEFAULT_PITCH, fn);
+
+        // 创建画刷
+        brushWhite = CreateSolidBrush (RGB (255, 255, 255));
+        brushLightGray = CreateSolidBrush (RGB (245, 245, 245));
+        brushHover = CreateSolidBrush (RGB (230, 240, 255));
+        brushHighlight = CreateSolidBrush (RGB (255, 200, 200));
+
+        // 创建画笔
+        penBorder = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
+        penDivider = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
+        penHighlight = CreatePen (PS_SOLID, 2, RGB (100, 149, 237));
+    }
+
+    // 释放所有缓存对象
+    void Cleanup ()
+    {
+        // 释放字体
+        if (fontTitle) DeleteObject (fontTitle);
+        if (fontSection) DeleteObject (fontSection);
+        if (fontContent) DeleteObject (fontContent);
+        if (fontButton) DeleteObject (fontButton);
+        if (fontSmall) DeleteObject (fontSmall);
+
+        // 释放画刷
+        if (brushWhite) DeleteObject (brushWhite);
+        if (brushLightGray) DeleteObject (brushLightGray);
+        if (brushHover) DeleteObject (brushHover);
+        if (brushHighlight) DeleteObject (brushHighlight);
+
+        // 释放画笔
+        if (penBorder) DeleteObject (penBorder);
+        if (penDivider) DeleteObject (penDivider);
+        if (penHighlight) DeleteObject (penHighlight);
+    }
+};
+GDICache G_GDICache;
+
 // 获取exe所在目录
 wstring GetExeDir ()
 {
@@ -277,7 +360,7 @@ vector<ClipRecord> GetFilteredRecords ()
 static wstring G_CachedFontName;
 static bool G_FontInitialized = false;
 
-// 获取系统可用字体
+// 获取系统可用字体（供 GDICache 使用）
 static wstring GetAvailableFont ()
 {
     // 如果已经缓存，直接返回
@@ -432,18 +515,11 @@ void DrawSearchBox (HDC hdc, int x, int y, int width)
     Rectangle (hdc, x, y, x + width, y + 50);
     DeleteObject (borderPen);
 
-    // 绘制搜索图标
+    // 绘制搜索图标和输入文本（使用缓存字体）
     SetTextColor (hdc, RGB (150, 150, 150));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT iconFont = CreateFont (22, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont ().c_str ());
-    SelectObject (hdc, iconFont);
+    SelectObject (hdc, G_GDICache.fontContent);
     TextOut (hdc, x + 15, y + 12, L"🔍", 1);
-    DeleteObject (iconFont);
-
-    // 绘制输入文本
-    wstring fontName = GetAvailableFont ();
-    HFONT inputFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, fontName.c_str ());
-    SelectObject (hdc, inputFont);
 
     if (G_SearchText.empty () && !G_SearchFocused)
     {
@@ -456,19 +532,14 @@ void DrawSearchBox (HDC hdc, int x, int y, int width)
         TextOut (hdc, x + 50, y + 14, G_SearchText.c_str (), G_SearchText.length ());
     }
 
-    DeleteObject (inputFont);
-
     // 绘制光标（获得焦点时显示）
     if (G_SearchFocused)
     {
-        // 计算光标位置
+        // 计算光标位置（使用缓存字体）
         SIZE textSize = { 0, 0 };
         if (!G_SearchText.empty ())
         {
-            HFONT tempFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-            SelectObject (hdc, tempFont);
             GetTextExtentPoint32 (hdc, G_SearchText.c_str (), G_SearchText.length (), &textSize);
-            DeleteObject (tempFont);
         }
 
         // 绘制光标竖线
@@ -491,24 +562,19 @@ void DrawButton (HDC hdc, int x, int y, int width, int height, const wstring& te
     DeleteObject (bgBrush);
 
     // 绘制边框
-    HPEN borderPen = CreatePen (PS_SOLID, 1, RGB (180, 180, 180));
-    SelectObject (hdc, borderPen);
+    SelectObject (hdc, G_GDICache.penBorder);
     Rectangle (hdc, x, y, x + width, y + height);
-    DeleteObject (borderPen);
 
-    // 绘制文字
+    // 绘制文字（使用缓存字体）
     SetTextColor (hdc, RGB (80, 80, 80));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT btnFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-    SelectObject (hdc, btnFont);
+    SelectObject (hdc, G_GDICache.fontButton);
 
     SIZE textSize;
     GetTextExtentPoint32 (hdc, text.c_str (), text.length (), &textSize);
     int textX = x + (width - textSize.cx) / 2;
     int textY = y + (height - textSize.cy) / 2;
     TextOut (hdc, textX, textY, text.c_str (), text.length ());
-
-    DeleteObject (btnFont);
 }
 
 // 绘制设置按钮（齿轮图标）
@@ -523,13 +589,11 @@ void DrawSettingsButton (HDC hdc, int x, int y, bool isHovered)
     FillRect (hdc, &bgRect, bgBrush);
     DeleteObject (bgBrush);
 
-    // 绘制齿轮图标
+    // 绘制齿轮图标（使用缓存字体）
     SetTextColor (hdc, RGB (100, 100, 100));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT iconFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Segoe UI Emoji");
-    SelectObject (hdc, iconFont);
+    SelectObject (hdc, G_GDICache.fontContent);
     TextOut (hdc, x + 6, y + 4, L"⚙", 1);
-    DeleteObject (iconFont);
 }
 
 // 绘制垃圾桶按钮（选择模式切换）
@@ -544,13 +608,11 @@ void DrawDeleteModeButton (HDC hdc, int x, int y, bool isHovered, bool isActive)
     FillRect (hdc, &bgRect, bgBrush);
     DeleteObject (bgBrush);
 
-    // 绘制垃圾桶图标
+    // 绘制垃圾桶图标（使用缓存字体）
     SetTextColor (hdc, isActive ? RGB (200, 50, 50) : RGB (100, 100, 100));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT iconFont = CreateFont (20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Segoe UI Emoji");
-    SelectObject (hdc, iconFont);
+    SelectObject (hdc, G_GDICache.fontContent);
     TextOut (hdc, x + 6, y + 4, L"🗑", 1);
-    DeleteObject (iconFont);
 }
 
 // 绘制返回按钮
@@ -567,18 +629,14 @@ void DrawBackButton (HDC hdc, int x, int y, bool isHovered)
     DeleteObject (bgBrush);
 
     // 绘制边框
-    HPEN borderPen = CreatePen (PS_SOLID, 1, RGB (180, 180, 180));
-    SelectObject (hdc, borderPen);
+    SelectObject (hdc, G_GDICache.penBorder);
     Rectangle (hdc, x, y, x + width, y + height);
-    DeleteObject (borderPen);
 
-    // 绘制文字
+    // 绘制文字（使用缓存字体）
     SetTextColor (hdc, RGB (80, 80, 80));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT btnFont = CreateFont (18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-    SelectObject (hdc, btnFont);
+    SelectObject (hdc, G_GDICache.fontButton);
     TextOut (hdc, x + 12, y + 7, L"← 返回", 5);
-    DeleteObject (btnFont);
 }
 
 // 绘制设置页面
@@ -587,28 +645,23 @@ void DrawSettingsPage (HDC hdc)
     // 绘制返回按钮
     DrawBackButton (hdc, 20, 10, false);
 
-    // 绘制标题
+    // 绘制标题（使用缓存字体）
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT titleFont = CreateFont (36, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-    SelectObject (hdc, titleFont);
+    SelectObject (hdc, G_GDICache.fontTitle);
     TextOut (hdc, 100, 12, L"设置", 2);
-    DeleteObject (titleFont);
 
-    // 创建分割线画笔（整个函数复用）
-    HPEN linePen = CreatePen (PS_SOLID, 1, RGB (230, 230, 230));
+    // 使用缓存分割线画笔
 
     // 绘制分割线
-    SelectObject (hdc, linePen);
+    SelectObject (hdc, G_GDICache.penDivider);
     MoveToEx (hdc, 20, 55, NULL);
     LineTo (hdc, G_WindowWidth - 20, 55);
 
-    // 保存时间设置
+    // 保存时间设置（使用缓存字体）
     SetTextColor (hdc, RGB (33, 33, 33));
-    HFONT sectionFont = CreateFont (26, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-    SelectObject (hdc, sectionFont);
+    SelectObject (hdc, G_GDICache.fontSection);
     TextOut (hdc, 20, 80, L"保存时间", 4);
-    DeleteObject (sectionFont);
 
     // 绘制下拉菜单框（在右边）
     int dropdownWidth = 200;
@@ -616,40 +669,33 @@ void DrawSettingsPage (HDC hdc)
     int dropdownX = G_WindowWidth - dropdownWidth - 40;
     int dropdownY = 75;
 
-    // 绘制下拉框背景
-    COLORREF bgColor = RGB (255, 255, 255);
-    HBRUSH bgBrush = CreateSolidBrush (bgColor);
+    // 绘制下拉框背景（使用缓存画刷）
     RECT bgRect = { dropdownX, dropdownY, dropdownX + dropdownWidth, dropdownY + dropdownHeight };
-    FillRect (hdc, &bgRect, bgBrush);
-    DeleteObject (bgBrush);
+    FillRect (hdc, &bgRect, G_GDICache.brushWhite);
 
-    // 绘制边框（临时切换画笔，用完恢复）
-    HPEN borderPen = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
-    HPEN prevPen = (HPEN)SelectObject (hdc, borderPen);
+    // 绘制边框（使用缓存画笔）
+    SelectObject (hdc, G_GDICache.penBorder);
     Rectangle (hdc, dropdownX, dropdownY, dropdownX + dropdownWidth, dropdownY + dropdownHeight);
-    SelectObject (hdc, prevPen);
-    DeleteObject (borderPen);
 
-    // 绘制当前选中的值
+    // 绘制当前选中的值（使用缓存字体）
     SetTextColor (hdc, RGB (33, 33, 33));
     SetBkMode (hdc, TRANSPARENT);
-    HFONT valueFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-    SelectObject (hdc, valueFont);
+    SelectObject (hdc, G_GDICache.fontContent);
     TextOut (hdc, dropdownX + 15, dropdownY + 10, RETENTION_LABELS[G_SelectedRetentionIndex], wcslen (RETENTION_LABELS[G_SelectedRetentionIndex]));
 
     // 绘制下拉箭头
     SetTextColor (hdc, RGB (100, 100, 100));
     TextOut (hdc, dropdownX + dropdownWidth - 25, dropdownY + 10, L"▼", 1);
-    DeleteObject (valueFont);
 
     // 绘制分割线
+    SelectObject (hdc, G_GDICache.penDivider);
     MoveToEx (hdc, 20, 140, NULL);
     LineTo (hdc, G_WindowWidth - 20, 140);
 
     // 开机自启设置
+    // 开机自启设置（使用缓存字体）
     SetTextColor (hdc, RGB (33, 33, 33));
-    HFONT autoStartFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-    SelectObject (hdc, autoStartFont);
+    SelectObject (hdc, G_GDICache.fontSection);
     TextOut (hdc, 20, 158, L"开机自启", 4);
 
     // 绘制开关按钮
@@ -665,38 +711,35 @@ void DrawSettingsPage (HDC hdc)
     FillRect (hdc, &toggleRect, toggleBgBrush);
     DeleteObject (toggleBgBrush);
 
-    // 绘制开关圆角边框（临时切换画笔和画刷，用完恢复）
+    // 绘制开关圆角边框
     HPEN togglePen = CreatePen (PS_SOLID, 1, toggleBgColor);
     HBRUSH nullBrush = (HBRUSH)GetStockObject (NULL_BRUSH);
-    prevPen = (HPEN)SelectObject (hdc, togglePen);
+    HPEN prevPen = (HPEN)SelectObject (hdc, togglePen);
     HBRUSH prevBrush = (HBRUSH)SelectObject (hdc, nullBrush);
     RoundRect (hdc, toggleX, toggleY, toggleX + toggleWidth, toggleY + toggleHeight, toggleHeight, toggleHeight);
     SelectObject (hdc, prevBrush);
     SelectObject (hdc, prevPen);
     DeleteObject (togglePen);
 
-    // 绘制开关文字
+    // 绘制开关文字（使用缓存字体）
     SetBkMode (hdc, TRANSPARENT);
     SetTextColor (hdc, RGB (255, 255, 255));
-    HFONT toggleFont = CreateFont (22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-    SelectObject (hdc, toggleFont);
+    SelectObject (hdc, G_GDICache.fontSection);
     const wchar_t* toggleText = G_AutoStart ? L"开" : L"关";
     SIZE toggleTextSize;
     GetTextExtentPoint32 (hdc, toggleText, 1, &toggleTextSize);
     int toggleTextX = toggleX + (toggleWidth - toggleTextSize.cx) / 2;
     int toggleTextY = toggleY + (toggleHeight - toggleTextSize.cy) / 2;
     TextOut (hdc, toggleTextX, toggleTextY, toggleText, 1);
-    DeleteObject (toggleFont);
-    DeleteObject (autoStartFont);
 
     // 绘制分割线
+    SelectObject (hdc, G_GDICache.penDivider);
     MoveToEx (hdc, 20, 200, NULL);
     LineTo (hdc, G_WindowWidth - 20, 200);
 
-    // 关闭时最小化到托盘设置
+    // 关闭时最小化到托盘设置（使用缓存字体）
     SetTextColor (hdc, RGB (33, 33, 33));
-    HFONT minimizeFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-    SelectObject (hdc, minimizeFont);
+    SelectObject (hdc, G_GDICache.fontSection);
     TextOut (hdc, 20, 218, L"关闭时最小化到托盘", 9);
 
     // 绘制开关按钮
@@ -721,28 +764,25 @@ void DrawSettingsPage (HDC hdc)
     SelectObject (hdc, prevPen2);
     DeleteObject (minimizeTogglePen);
 
-    // 绘制开关文字
+    // 绘制开关文字（使用缓存字体）
     SetBkMode (hdc, TRANSPARENT);
     SetTextColor (hdc, RGB (255, 255, 255));
-    HFONT minimizeToggleFont = CreateFont (22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-    SelectObject (hdc, minimizeToggleFont);
+    SelectObject (hdc, G_GDICache.fontSection);
     const wchar_t* minimizeToggleText = G_MinimizeToTray ? L"开" : L"关";
     SIZE minimizeToggleTextSize;
     GetTextExtentPoint32 (hdc, minimizeToggleText, 1, &minimizeToggleTextSize);
     int minimizeToggleTextX = minimizeToggleX + (minimizeToggleWidth - minimizeToggleTextSize.cx) / 2;
     int minimizeToggleTextY = minimizeToggleY + (minimizeToggleHeight - minimizeToggleTextSize.cy) / 2;
     TextOut (hdc, minimizeToggleTextX, minimizeToggleTextY, minimizeToggleText, 1);
-    DeleteObject (minimizeToggleFont);
-    DeleteObject (minimizeFont);
 
     // 绘制分割线
+    SelectObject (hdc, G_GDICache.penDivider);
     MoveToEx (hdc, 20, 260, NULL);
     LineTo (hdc, G_WindowWidth - 20, 260);
 
-    // 清理规则入口
+    // 清理规则入口（使用缓存字体）
     int cleanupY = 280;
-    HFONT cleanupFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-    SelectObject (hdc, cleanupFont);
+    SelectObject (hdc, G_GDICache.fontSection);
     SetTextColor (hdc, RGB (33, 33, 33));
     TextOut (hdc, 20, cleanupY, L"清理规则", 4);
 
@@ -754,10 +794,9 @@ void DrawSettingsPage (HDC hdc)
     MoveToEx (hdc, 20, cleanupY + 40, NULL);
     LineTo (hdc, G_WindowWidth - 20, cleanupY + 40);
 
-    // 版本信息入口
+    // 版本信息入口（使用缓存字体）
     int versionY = 340;
-    HFONT versionFont = CreateFont (26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-    SelectObject (hdc, versionFont);
+    SelectObject (hdc, G_GDICache.fontSection);
     SetTextColor (hdc, RGB (33, 33, 33));
     TextOut (hdc, 20, versionY, L"版本信息", 4);
 
@@ -766,28 +805,28 @@ void DrawSettingsPage (HDC hdc)
     TextOut (hdc, G_WindowWidth - 40, versionY, L"→", 1);
 
     // 绘制分割线
+    SelectObject (hdc, G_GDICache.penDivider);
     MoveToEx (hdc, 20, versionY + 40, NULL);
     LineTo (hdc, G_WindowWidth - 20, versionY + 40);
 
-    // 问题反馈入口
+    // 问题反馈入口（使用缓存字体）
     int feedbackY = 400;
+    SelectObject (hdc, G_GDICache.fontSection);
     SetTextColor (hdc, RGB (33, 33, 33));
     TextOut (hdc, 20, feedbackY, L"问题反馈", 4);
 
     // 绘制箭头
     SetTextColor (hdc, RGB (150, 150, 150));
     TextOut (hdc, G_WindowWidth - 40, feedbackY, L"→", 1);
-    DeleteObject (cleanupFont);
-    DeleteObject (versionFont);
 
     // 绘制分割线
+    SelectObject (hdc, G_GDICache.penDivider);
     MoveToEx (hdc, 20, feedbackY + 40, NULL);
     LineTo (hdc, G_WindowWidth - 20, feedbackY + 40);
 
-    // GitHub 仓库地址
+    // GitHub 仓库地址（使用缓存字体）
     int githubY = G_WindowHeight - 60;
-    HFONT githubFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-    SelectObject (hdc, githubFont);
+    SelectObject (hdc, G_GDICache.fontContent);
     SetTextColor (hdc, RGB (100, 100, 100));
     SetBkMode (hdc, TRANSPARENT);
     TextOut (hdc, 20, githubY, L"GitHub仓库地址:", 8);
@@ -795,7 +834,6 @@ void DrawSettingsPage (HDC hdc)
     // 绘制可点击的链接
     SetTextColor (hdc, RGB (100, 149, 237));
     TextOut (hdc, 200, githubY, APP_GITHUB_URL, wcslen (APP_GITHUB_URL));
-    DeleteObject (githubFont);
 
     // 最后绘制下拉菜单选项列表（确保在最上层）
     if (G_DropdownOpen)
@@ -809,25 +847,19 @@ void DrawSettingsPage (HDC hdc)
             bool isSelected = (i == G_SelectedRetentionIndex);
 
             // 绘制选项背景（当前选中的高亮显示）
-            COLORREF optBgColor = isSelected ? RGB (230, 240, 255) : RGB (255, 255, 255);
-            HBRUSH optBgBrush = CreateSolidBrush (optBgColor);
+            HBRUSH optBgBrush = isSelected ? G_GDICache.brushHover : G_GDICache.brushWhite;
             RECT optBgRect = { dropdownX, optionY, dropdownX + dropdownWidth, optionY + optionHeight };
             FillRect (hdc, &optBgRect, optBgBrush);
-            DeleteObject (optBgBrush);
 
-            // 绘制边框
-            HPEN optBorderPen = CreatePen (PS_SOLID, 1, RGB (200, 200, 200));
-            HPEN savedPen = (HPEN)SelectObject (hdc, optBorderPen);
+            // 绘制边框（使用缓存画笔）
+            SelectObject (hdc, G_GDICache.penBorder);
             Rectangle (hdc, dropdownX, optionY, dropdownX + dropdownWidth, optionY + optionHeight);
-            SelectObject (hdc, savedPen);
-            DeleteObject (optBorderPen);
 
-            // 绘制文字（当前选中的加一个✓标记）
+            // 绘制文字（使用缓存字体）
             COLORREF textColor = isSelected ? RGB (100, 149, 237) : RGB (33, 33, 33);
             SetTextColor (hdc, textColor);
             SetBkMode (hdc, TRANSPARENT);
-            HFONT optionFont = CreateFont (24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, GetAvailableFont().c_str());
-            SelectObject (hdc, optionFont);
+            SelectObject (hdc, G_GDICache.fontContent);
 
             SIZE textSize;
             GetTextExtentPoint32 (hdc, RETENTION_LABELS[i], wcslen (RETENTION_LABELS[i]), &textSize);
@@ -840,13 +872,8 @@ void DrawSettingsPage (HDC hdc)
             {
                 TextOut (hdc, dropdownX + dropdownWidth - 30, textY, L"✓", 1);
             }
-
-            DeleteObject (optionFont);
         }
     }
-
-    // 清理分割线画笔
-    DeleteObject (linePen);
 }
 
 // 绘制版本号页面
@@ -1691,6 +1718,9 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_DESTROY:
         // 移除剪贴板监听
         RemoveClipboardFormatListener (hWnd);
+
+        // 清理 GDI 对象缓存
+        G_GDICache.Cleanup ();
 
         // 清理GDI+
         G_ClipManager.ShutdownGdiplus ();
@@ -2568,6 +2598,9 @@ int main (int argc, char* argv[])
 
     // 初始化GDI+
     G_ClipManager.InitializeGdiplus ();
+
+    // 初始化 GDI 对象缓存
+    G_GDICache.Initialize ();
 
     // 添加托盘图标
     AddTrayIcon (hWnd);
