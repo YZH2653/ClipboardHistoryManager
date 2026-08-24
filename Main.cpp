@@ -22,8 +22,8 @@ ClipboardManager G_ClipManager;
 Storage G_Storage;
 
 // 版本号
-const wchar_t* APP_VERSION = L"1.8.0.0";
-const wchar_t* APP_UPDATE_DATE = L"2026-08-14";
+const wchar_t* APP_VERSION = L"1.9.0.0";
+const wchar_t* APP_UPDATE_DATE = L"2026-08-23";
 const wchar_t* APP_AUTHOR = L"YZH2653";
 const wchar_t* APP_AUTHOR_EMAIL = L"yzh2653@163.com";
 const wchar_t* APP_GITHUB_URL = L"https://github.com/YZH2653/ClipboardHistoryManager";
@@ -69,6 +69,16 @@ vector<int> G_SelectedItems;  // 选中的记录ID列表
 bool G_ShowCleanupRuleEditDialog = false;  // 是否显示编辑对话框
 CleanupRule G_EditingCleanupRule;          // 当前正在编辑的规则
 bool G_IsNewCleanupRule = false;           // 是否是新规则
+
+// 全局快捷键配置
+#define HOTKEY_ID_TOGGLE_WINDOW 1  // 显示/隐藏窗口
+#define HOTKEY_ID_QUICK_COPY    2  // 快速复制最近记录
+
+UINT G_HotkeyToggleModifiers = MOD_CONTROL | MOD_ALT;  // Ctrl+Alt
+UINT G_HotkeyToggleKey = 0x56;  // V 键
+UINT G_HotkeyCopyModifiers = MOD_CONTROL | MOD_ALT;    // Ctrl+Alt
+UINT G_HotkeyCopyKey = 0x43;    // C 键
+bool G_HotkeysRegistered = false;
 
 // 窗口尺寸
 int G_WindowWidth = 800;
@@ -960,15 +970,13 @@ void DrawVersionPage (HDC hdc)
 
     // 更新内容列表
     SetTextColor (hdc, RGB (33, 33, 33));
-    TextOut (hdc, 40, contentY, L"• GDI对象缓存，减少创建销毁开销", 10);
+    TextOut (hdc, 40, contentY, L"• Ctrl+Alt+V 快速显示/隐藏窗口", 10);
     contentY += 35;
-    TextOut (hdc, 40, contentY, L"• 双缓冲绘制，消除界面闪烁", 10);
+    TextOut (hdc, 40, contentY, L"• Ctrl+Alt+C 快速复制最近记录", 10);
     contentY += 35;
-    TextOut (hdc, 40, contentY, L"• 筛选结果缓存，提升响应速度", 9);
+    TextOut (hdc, 40, contentY, L"• 全局快捷键，随时响应", 9);
     contentY += 35;
-    TextOut (hdc, 40, contentY, L"• 优化搜索逻辑，提升流畅性", 8);
-    contentY += 35;
-    TextOut (hdc, 40, contentY, L"• 更新版本号到1.8.0.0", 8);
+    TextOut (hdc, 40, contentY, L"• 更新版本号到1.9.0.0", 8);
     contentY += lineHeight + 20;
 
     // 作者
@@ -1751,7 +1759,47 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         return 0;
     }
 
+    case WM_HOTKEY:
+    {
+        if (wParam == HOTKEY_ID_TOGGLE_WINDOW)
+        {
+            // 切换窗口显示/隐藏
+            if (G_IsMinimizedToTray || !IsWindowVisible (hWnd))
+            {
+                RestoreFromTray (hWnd);
+            }
+            else
+            {
+                MinimizeToTray (hWnd);
+            }
+            return 0;
+        }
+        else if (wParam == HOTKEY_ID_QUICK_COPY)
+        {
+            // 快速复制最近一条记录
+            const vector<ClipRecord>& records = G_ClipManager.GetRecords ();
+            if (!records.empty ())
+            {
+                // 找到最近一条非图片记录
+                for (const auto& record : records)
+                {
+                    if (record.type == CLIP_TEXT && !record.content.empty ())
+                    {
+                        G_ClipManager.CopyToClipboard (record.content);
+                        break;
+                    }
+                }
+            }
+            return 0;
+        }
+        return 0;
+    }
+
     case WM_DESTROY:
+        // 注销全局快捷键
+        UnregisterHotKey (hWnd, HOTKEY_ID_TOGGLE_WINDOW);
+        UnregisterHotKey (hWnd, HOTKEY_ID_QUICK_COPY);
+
         // 移除剪贴板监听
         RemoveClipboardFormatListener (hWnd);
 
@@ -2648,6 +2696,10 @@ int main (int argc, char* argv[])
 
     // 添加托盘图标
     AddTrayIcon (hWnd);
+
+    // 注册全局快捷键
+    G_HotkeysRegistered = RegisterHotKey (hWnd, HOTKEY_ID_TOGGLE_WINDOW, G_HotkeyToggleModifiers, G_HotkeyToggleKey);
+    RegisterHotKey (hWnd, HOTKEY_ID_QUICK_COPY, G_HotkeyCopyModifiers, G_HotkeyCopyKey);
 
     // 加载最小化到托盘设置
     G_Storage.LoadMinimizeToTraySetting (G_MinimizeToTray);
