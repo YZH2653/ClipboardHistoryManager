@@ -1777,12 +1777,19 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         else if (wParam == HOTKEY_ID_QUICK_COPY)
         {
-            // 快速复制最近一条记录
+            // 快速复制最新的一条文字记录
             const vector<ClipRecord>& records = G_ClipManager.GetRecords ();
             if (!records.empty ())
             {
-                // 找到最近一条非图片记录
-                for (const auto& record : records)
+                // 按时间倒序排序，找到最新的文字记录
+                vector<ClipRecord> sortedRecords = records;
+                sort (sortedRecords.begin (), sortedRecords.end (), [] (const ClipRecord& a, const ClipRecord& b)
+                {
+                    return a.timestamp > b.timestamp;
+                });
+
+                // 复制最新的文字记录
+                for (const auto& record : sortedRecords)
                 {
                     if (record.type == CLIP_TEXT && !record.content.empty ())
                     {
@@ -2601,6 +2608,24 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 // 主函数
 int main (int argc, char* argv[])
 {
+    // 防止重复打开：使用命名互斥锁
+    HANDLE hMutex = CreateMutexW (NULL, TRUE, L"ClipboardHistoryManager_Mutex");
+    if (GetLastError () == ERROR_ALREADY_EXISTS)
+    {
+        // 已有实例在运行，查找并激活已有窗口
+        HWND existingWnd = FindWindowW (L"ClipboardHistoryClass", NULL);
+        if (existingWnd)
+        {
+            // 如果窗口最小化到托盘，恢复显示
+            if (!IsWindowVisible (existingWnd))
+            {
+                ShowWindow (existingWnd, SW_RESTORE);
+            }
+            SetForegroundWindow (existingWnd);
+        }
+        return 0;
+    }
+
     // 检查是否有 --minimized 参数（开机自启时使用）
     bool startMinimized = false;
     for (int i = 1; i < argc; i++)
@@ -2707,8 +2732,18 @@ int main (int argc, char* argv[])
     AddTrayIcon (hWnd);
 
     // 注册全局快捷键
-    G_HotkeysRegistered = RegisterHotKey (hWnd, HOTKEY_ID_TOGGLE_WINDOW, G_HotkeyToggleModifiers, G_HotkeyToggleKey);
-    RegisterHotKey (hWnd, HOTKEY_ID_QUICK_COPY, G_HotkeyCopyModifiers, G_HotkeyCopyKey);
+    BOOL reg1 = RegisterHotKey (hWnd, HOTKEY_ID_TOGGLE_WINDOW, G_HotkeyToggleModifiers, G_HotkeyToggleKey);
+    BOOL reg2 = RegisterHotKey (hWnd, HOTKEY_ID_QUICK_COPY, G_HotkeyCopyModifiers, G_HotkeyCopyKey);
+    G_HotkeysRegistered = (reg1 && reg2);
+
+    // 调试：如果注册失败，显示提示
+    if (!G_HotkeysRegistered)
+    {
+        wstring msg = L"快捷键注册失败！\n";
+        msg += L"Ctrl+Alt+V: " + wstring (reg1 ? L"成功" : L"失败") + L"\n";
+        msg += L"Ctrl+Alt+C: " + wstring (reg2 ? L"成功" : L"失败");
+        MessageBoxW (hWnd, msg.c_str(), L"快捷键注册", MB_OK | MB_ICONWARNING);
+    }
 
     // 加载最小化到托盘设置
     G_Storage.LoadMinimizeToTraySetting (G_MinimizeToTray);

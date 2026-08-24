@@ -98,7 +98,7 @@ bool ClipboardManager::IsValidContent (const wstring& content)
     return true;
 }
 
-// 检查是否与最近记录重复
+// 检查是否与历史记录重复
 bool ClipboardManager::IsDuplicate (const wstring& content)
 {
     if (m_records.empty ())
@@ -106,11 +106,10 @@ bool ClipboardManager::IsDuplicate (const wstring& content)
         return false;
     }
 
-    // 检查是否与最近5条记录中的任意一条相同（防止短时间内重复）
-    int checkCount = min (5, (int)m_records.size ());
-    for (int i = 0; i < checkCount; i++)
+    // 检查所有记录，防止重复
+    for (const auto& record : m_records)
     {
-        if (m_records[i].type == CLIP_TEXT && m_records[i].content == content)
+        if (record.type == CLIP_TEXT && record.content == content)
         {
             return true;
         }
