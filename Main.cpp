@@ -233,9 +233,10 @@ void RestoreFromTray (HWND hWnd)
     G_SelectedItems.clear ();
     G_SelectAll = false;
 
-    // 显示窗口
-    ShowWindow (hWnd, SW_SHOW);
+    // 恢复窗口显示
+    ShowWindow (hWnd, SW_RESTORE);
     SetForegroundWindow (hWnd);
+    BringWindowToTop (hWnd);
     G_IsMinimizedToTray = false;
     InvalidateRect (hWnd, NULL, TRUE);
 }
@@ -1942,6 +1943,14 @@ LRESULT CALLBACK WindowProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 wstring hintText = G_SearchText.empty () ? L"暂无历史记录，请复制内容测试" : L"未找到匹配的记录";
                 TextOut (memDC, G_WindowWidth / 2 - 150, G_WindowHeight / 2, hintText.c_str (), hintText.length ());
             }
+
+            // 底部快捷键提示
+            SelectObject (memDC, G_GDICache.fontSmall);
+            SetTextColor (memDC, RGB (150, 150, 150));
+            wstring hotkeyHint = L"快捷键: Ctrl+Alt+V 显示/隐藏窗口  |  Ctrl+Alt+C 快速复制最近记录";
+            SIZE hotkeySize;
+            GetTextExtentPoint32 (memDC, hotkeyHint.c_str (), hotkeyHint.length (), &hotkeySize);
+            TextOut (memDC, (G_WindowWidth - hotkeySize.cx) / 2, G_WindowHeight - 30, hotkeyHint.c_str (), hotkeyHint.length ());
         }
         else if (G_CurrentPage == PAGE_SETTINGS)
         {
