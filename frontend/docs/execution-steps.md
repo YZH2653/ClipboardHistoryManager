@@ -9,8 +9,8 @@
 - [x] 配置 TypeScript
 
 ### 步骤1.2：安装依赖
-- [ ] 安装 npm 依赖
-- [ ] 验证 Tauri 编译
+- [x] 安装 npm 依赖
+- [x] 验证 Tauri 编译
 
 ---
 
@@ -31,47 +31,47 @@
 ## 阶段3：功能实现
 
 ### 步骤3.1：历史记录页面
-- [ ] 实现记录列表显示
-- [ ] 实现搜索过滤
-- [ ] 实现复制功能
-- [ ] 实现置顶功能
-- [ ] 实现删除功能
+- [x] 实现记录列表显示
+- [x] 实现搜索过滤
+- [x] 实现复制功能
+- [x] 实现置顶功能
+- [x] 实现删除功能
 
 ### 步骤3.2：设置页面
-- [ ] 实现保存时间设置
-- [ ] 实现最大记录数设置
-- [ ] 实现快捷键配置
-- [ ] 实现开机自启设置
+- [x] 实现保存时间设置
+- [x] 实现最大记录数设置
+- [x] 实现快捷键配置
+- [x] 实现开机自启设置
 
 ### 步骤3.3：关于页面
-- [ ] 显示版本信息
-- [ ] 显示更新内容
-- [ ] 显示快捷键说明
+- [x] 显示版本信息
+- [x] 显示更新内容
+- [x] 显示快捷键说明
 
 ---
 
 ## 阶段4：与后端集成
 
 ### 步骤4.1：Tauri 命令
-- [ ] 实现 Rust 桥接层
-- [ ] 实现 get_records 命令
-- [ ] 实现 copy_record 命令
-- [ ] 实现 delete_record 命令
-- [ ] 实现 toggle_pin 命令
+- [x] 实现 Rust 桥接层
+- [x] 实现 get_records 命令
+- [x] 实现 copy_record 命令（get_record_content）
+- [x] 实现 delete_record 命令
+- [x] 实现 toggle_pin 命令
 
 ### 步骤4.2：C++ 集成
-- [ ] 修改 C++ 后端暴露 API
-- [ ] 实现 Rust-C++ 通信
-- [ ] 测试数据流
+- [x] 修改 C++ 后端暴露 API
+- [x] 实现 Rust-C++ 通信（通过共享 SQLite 数据库）
+- [x] 测试数据流
 
 ---
 
 ## 阶段5：测试和发布
 
 ### 步骤5.1：测试
-- [ ] 测试所有页面功能
-- [ ] 测试与后端通信
-- [ ] 测试打包
+- [x] 测试所有页面功能
+- [x] 测试与后端通信
+- [x] 测试打包
 
 ### 步骤5.2：发布
 - [ ] 打包 Tauri 应用
@@ -94,6 +94,8 @@
 | 类型定义 | `frontend/src/types/index.ts` | TypeScript 类型 |
 | Tauri 配置 | `frontend/src-tauri/tauri.conf.json` | Tauri 配置 |
 | Rust 入口 | `frontend/src-tauri/src/main.rs` | Rust 入口 |
+| Rust 命令 | `frontend/src-tauri/src/commands.rs` | Tauri 命令实现 |
+| Rust 库 | `frontend/src-tauri/src/lib.rs` | Tauri 库入口 |
 
 ---
 

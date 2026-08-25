@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
     Input,
     List,
@@ -11,6 +11,7 @@ import {
     message,
     Checkbox,
     Dropdown,
+    Spin,
 } from "antd";
 import {
     SearchOutlined,
@@ -20,54 +21,41 @@ import {
     MoreOutlined,
     SelectOutlined,
     CloseCircleOutlined,
+    ReloadOutlined,
 } from "@ant-design/icons";
 import type { ClipRecord } from "../types";
-
-// 模拟数据
-const mockRecords: ClipRecord[] = [
-    {
-        id: 1,
-        type: "text",
-        content: "这是一段复制的文本内容，用于测试显示效果",
-        preview: "这是一段复制的文本内容，用于测试显示效果",
-        filePath: "",
-        timestamp: new Date().toISOString(),
-        isPinned: true,
-    },
-    {
-        id: 2,
-        type: "text",
-        content: "Hello World - 测试英文内容",
-        preview: "Hello World - 测试英文内容",
-        filePath: "",
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-        isPinned: false,
-    },
-    {
-        id: 3,
-        type: "text",
-        content: "剪贴板管理器测试内容，这是一段比较长的文本，用来测试截断显示效果",
-        preview: "剪贴板管理器测试内容，这是一段比较长的文本，用来测试截断显示效果",
-        filePath: "",
-        timestamp: new Date(Date.now() - 7200000).toISOString(),
-        isPinned: false,
-    },
-    {
-        id: 4,
-        type: "text",
-        content: "React + TypeScript + Ant Design",
-        preview: "React + TypeScript + Ant Design",
-        filePath: "",
-        timestamp: new Date(Date.now() - 10800000).toISOString(),
-        isPinned: false,
-    },
-];
+import {
+    getRecords,
+    getRecordContent,
+    deleteRecord,
+    togglePin,
+    batchDeleteRecords,
+} from "../utils/api";
 
 function HistoryPage() {
     const [searchText, setSearchText] = useState("");
-    const [records, setRecords] = useState<ClipRecord[]>(mockRecords);
+    const [records, setRecords] = useState<ClipRecord[]>([]);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [isSelectMode, setIsSelectMode] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+    // 加载记录
+    const loadRecords = useCallback(async () => {
+        try {
+            setLoading(true);
+            const data = await getRecords();
+            setRecords(data);
+        } catch (error) {
+            console.error("加载记录失败:", error);
+            message.error("加载记录失败");
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadRecords();
+    }, [loadRecords]);
 
     // 过滤和排序记录
     const filteredRecords = useMemo(() => {
@@ -107,33 +95,59 @@ function HistoryPage() {
     };
 
     // 复制记录
-    const handleCopy = (record: ClipRecord) => {
-        navigator.clipboard.writeText(record.content);
-        message.success("已复制到剪贴板");
+    const handleCopy = async (record: ClipRecord) => {
+        try {
+            const content = await getRecordContent(record.id);
+            await navigator.clipboard.writeText(content);
+            message.success("已复制到剪贴板");
+        } catch (error) {
+            // 降级：直接使用记录中的内容
+            try {
+                await navigator.clipboard.writeText(record.content);
+                message.success("已复制到剪贴板");
+            } catch {
+                message.error("复制失败");
+            }
+        }
     };
 
     // 切换置顶
-    const handleTogglePin = (record: ClipRecord) => {
-        setRecords((prev) =>
-            prev.map((r) =>
-                r.id === record.id ? { ...r, isPinned: !r.isPinned } : r,
-            ),
-        );
-        message.success(record.isPinned ? "已取消置顶" : "已置顶");
+    const handleTogglePin = async (record: ClipRecord) => {
+        try {
+            await togglePin(record.id);
+            setRecords((prev) =>
+                prev.map((r) =>
+                    r.id === record.id ? { ...r, isPinned: !r.isPinned } : r,
+                ),
+            );
+            message.success(record.isPinned ? "已取消置顶" : "已置顶");
+        } catch (error) {
+            message.error("操作失败");
+        }
     };
 
     // 删除记录
-    const handleDelete = (record: ClipRecord) => {
-        setRecords((prev) => prev.filter((r) => r.id !== record.id));
-        message.success("已删除");
+    const handleDelete = async (record: ClipRecord) => {
+        try {
+            await deleteRecord(record.id);
+            setRecords((prev) => prev.filter((r) => r.id !== record.id));
+            message.success("已删除");
+        } catch (error) {
+            message.error("删除失败");
+        }
     };
 
     // 批量删除
-    const handleBatchDelete = () => {
-        setRecords((prev) => prev.filter((r) => !selectedIds.includes(r.id)));
-        setSelectedIds([]);
-        setIsSelectMode(false);
-        message.success(`已删除 ${selectedIds.length} 条记录`);
+    const handleBatchDelete = async () => {
+        try {
+            await batchDeleteRecords(selectedIds);
+            setRecords((prev) => prev.filter((r) => !selectedIds.includes(r.id)));
+            message.success(`已删除 ${selectedIds.length} 条记录`);
+            setSelectedIds([]);
+            setIsSelectMode(false);
+        } catch (error) {
+            message.error("批量删除失败");
+        }
     };
 
     // 切换选择
@@ -201,6 +215,13 @@ function HistoryPage() {
                 />
 
                 <Space>
+                    <Button
+                        icon={<ReloadOutlined />}
+                        onClick={loadRecords}
+                        loading={loading}
+                    >
+                        刷新
+                    </Button>
                     {isSelectMode ? (
                         <>
                             <Button
@@ -248,106 +269,123 @@ function HistoryPage() {
             </div>
 
             {/* 记录列表 */}
-            {filteredRecords.length > 0 ? (
-                <List
-                    dataSource={filteredRecords}
-                    renderItem={(record) => (
-                        <List.Item style={{ padding: "8px 0" }}>
-                            <Card
-                                size="small"
-                                style={{
-                                    width: "100%",
-                                    borderLeft: record.isPinned
-                                        ? "3px solid #fa8c16"
-                                        : "3px solid #1890ff",
-                                }}
-                                hoverable
-                            >
-                                <div
+            <Spin spinning={loading}>
+                {filteredRecords.length > 0 ? (
+                    <List
+                        dataSource={filteredRecords}
+                        renderItem={(record) => (
+                            <List.Item style={{ padding: "8px 0" }}>
+                                <Card
+                                    size="small"
                                     style={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        alignItems: "flex-start",
+                                        width: "100%",
+                                        borderLeft: record.isPinned
+                                            ? "3px solid #fa8c16"
+                                            : "3px solid #1890ff",
                                     }}
+                                    hoverable
                                 >
-                                    {/* 选择框 */}
-                                    {isSelectMode && (
-                                        <Checkbox
-                                            checked={selectedIds.includes(record.id)}
-                                            onChange={() => handleToggleSelect(record.id)}
-                                            style={{ marginRight: 12 }}
-                                        />
-                                    )}
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "flex-start",
+                                        }}
+                                    >
+                                        {/* 选择框 */}
+                                        {isSelectMode && (
+                                            <Checkbox
+                                                checked={selectedIds.includes(record.id)}
+                                                onChange={() => handleToggleSelect(record.id)}
+                                                style={{ marginRight: 12 }}
+                                            />
+                                        )}
 
-                                    {/* 内容区域 */}
-                                    <div style={{ flex: 1 }}>
-                                        <div
-                                            style={{
-                                                marginBottom: 8,
-                                                wordBreak: "break-all",
-                                                fontSize: 14,
-                                                lineHeight: 1.6,
-                                            }}
-                                        >
-                                            {record.content.length > 150
-                                                ? record.content.substring(0, 150) + "..."
-                                                : record.content}
+                                        {/* 内容区域 */}
+                                        <div style={{ flex: 1 }}>
+                                            <div
+                                                style={{
+                                                    marginBottom: 8,
+                                                    wordBreak: "break-all",
+                                                    fontSize: 14,
+                                                    lineHeight: 1.6,
+                                                }}
+                                            >
+                                                {record.type === "image" ? (
+                                                    <Space>
+                                                        <Tag color="purple">图片</Tag>
+                                                        <span style={{ color: "#999" }}>
+                                                            {record.preview || "图片记录"}
+                                                        </span>
+                                                    </Space>
+                                                ) : (
+                                                    <>
+                                                        {record.content.length > 150
+                                                            ? record.content.substring(0, 150) + "..."
+                                                            : record.content}
+                                                    </>
+                                                )}
+                                            </div>
+                                            <Space>
+                                                <Tag color="blue">
+                                                    {formatTime(record.timestamp)}
+                                                </Tag>
+                                                {record.isPinned && (
+                                                    <Tag color="orange">置顶</Tag>
+                                                )}
+                                                {record.type === "text" && (
+                                                    <Tag color="default">
+                                                        {record.content.length} 字符
+                                                    </Tag>
+                                                )}
+                                            </Space>
                                         </div>
-                                        <Space>
-                                            <Tag color="blue">
-                                                {formatTime(record.timestamp)}
-                                            </Tag>
-                                            {record.isPinned && (
-                                                <Tag color="orange">置顶</Tag>
-                                            )}
-                                            <Tag color="default">
-                                                {record.content.length} 字符
-                                            </Tag>
-                                        </Space>
-                                    </div>
 
-                                    {/* 操作按钮 */}
-                                    {!isSelectMode && (
-                                        <Space>
-                                            <Tooltip title="复制">
-                                                <Button
-                                                    type="text"
-                                                    icon={<CopyOutlined />}
-                                                    onClick={() => handleCopy(record)}
-                                                />
-                                            </Tooltip>
-                                            <Tooltip title={record.isPinned ? "取消置顶" : "置顶"}>
-                                                <Button
-                                                    type="text"
-                                                    icon={<PushpinOutlined />}
-                                                    onClick={() => handleTogglePin(record)}
-                                                    style={{
-                                                        color: record.isPinned
-                                                            ? "#fa8c16"
-                                                            : undefined,
-                                                    }}
-                                                />
-                                            </Tooltip>
-                                            <Dropdown menu={getMoreMenu(record)} trigger={["click"]}>
-                                                <Button
-                                                    type="text"
-                                                    icon={<MoreOutlined />}
-                                                />
-                                            </Dropdown>
-                                        </Space>
-                                    )}
-                                </div>
-                            </Card>
-                        </List.Item>
-                    )}
-                />
-            ) : (
-                <Empty
-                    description={
-                        searchText ? "未找到匹配的记录" : "暂无历史记录"
-                    }
-                />
-            )}
+                                        {/* 操作按钮 */}
+                                        {!isSelectMode && (
+                                            <Space>
+                                                <Tooltip title="复制">
+                                                    <Button
+                                                        type="text"
+                                                        icon={<CopyOutlined />}
+                                                        onClick={() => handleCopy(record)}
+                                                    />
+                                                </Tooltip>
+                                                <Tooltip title={record.isPinned ? "取消置顶" : "置顶"}>
+                                                    <Button
+                                                        type="text"
+                                                        icon={<PushpinOutlined />}
+                                                        onClick={() => handleTogglePin(record)}
+                                                        style={{
+                                                            color: record.isPinned
+                                                                ? "#fa8c16"
+                                                                : undefined,
+                                                        }}
+                                                    />
+                                                </Tooltip>
+                                                <Dropdown menu={getMoreMenu(record)} trigger={["click"]}>
+                                                    <Button
+                                                        type="text"
+                                                        icon={<MoreOutlined />}
+                                                    />
+                                                </Dropdown>
+                                            </Space>
+                                        )}
+                                    </div>
+                                </Card>
+                            </List.Item>
+                        )}
+                    />
+                ) : (
+                    !loading && (
+                        <Empty
+                            description={
+                                searchText ? "未找到匹配的记录" : "暂无历史记录"
+                            }
+                        />
+                    )
+                )}
+            </Spin>
         </div>
     );
 }
