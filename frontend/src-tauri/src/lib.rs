@@ -1,8 +1,8 @@
 mod commands;
+mod ffi;
 
-use commands::DbState;
-use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::Manager;
+use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -10,19 +10,23 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
-        // 单实例：重复打开时恢复已有窗口
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.set_focus();
             }
         }))
-        .manage(DbState::new())
         .setup(|app| {
-            // 初始化数据库
-            let state = app.state::<DbState>();
-            if let Err(e) = commands::init_db(&state) {
-                eprintln!("初始化数据库失败: {}", e);
+            // 获取exe目录，初始化C++后端
+            let exe_path = std::env::current_exe().unwrap_or_default();
+            let exe_dir = exe_path
+                .parent()
+                .unwrap_or(std::path::Path::new("."))
+                .to_string_lossy()
+                .to_string();
+
+            if !ffi::initialize(&exe_dir) {
+                eprintln!("C++后端初始化失败");
             }
 
             // 创建托盘菜单
@@ -38,19 +42,18 @@ pub fn run() {
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("历史剪贴板管理器")
                 .menu(&menu)
-                .on_menu_event(|app, event| {
-                    match event.id().as_ref() {
-                        "show" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
                         }
-                        "quit" => {
-                            app.exit(0);
-                        }
-                        _ => {}
                     }
+                    "quit" => {
+                        ffi::shutdown();
+                        app.exit(0);
+                    }
+                    _ => {}
                 })
                 .on_tray_icon_event(|tray_icon, event| {
                     if let TrayIconEvent::DoubleClick { .. } = event {
@@ -63,7 +66,7 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // 拦截关闭事件，最小化到托盘而不是退出
+            // 拦截关闭事件，最小化到托盘
             let window = app.get_webview_window("main").unwrap();
             let window_clone = window.clone();
             window.on_window_event(move |event| {
