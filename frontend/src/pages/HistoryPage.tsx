@@ -59,15 +59,57 @@ function HistoryPage() {
         return () => clearInterval(timer);
     }, [loadRecords]);
 
+    // 检查时间是否匹配搜索文本
+    const matchTimeFilter = (timestamp: string, searchText: string): boolean => {
+        const date = new Date(timestamp);
+        const pad = (n: number) => n.toString().padStart(2, "0");
+
+        const fullDate = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+        const shortDate = `${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+        const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        const yearMonth = `${date.getFullYear()}-${pad(date.getMonth() + 1)}`;
+        const year = `${date.getFullYear()}`;
+        const month = `${pad(date.getMonth() + 1)}`;
+        const day = `${pad(date.getDate())}`;
+
+        // YYYY-MM-DD
+        if (searchText.length === 10 && searchText[4] === "-" && searchText[7] === "-") {
+            return fullDate.includes(searchText);
+        }
+        // MM-DD
+        if (searchText.length === 5 && searchText[2] === "-") {
+            return shortDate.includes(searchText);
+        }
+        // HH:MM
+        if (searchText.length === 5 && searchText[2] === ":") {
+            return time.includes(searchText);
+        }
+        // YYYY-MM
+        if (searchText.length === 7 && searchText[4] === "-") {
+            return yearMonth.includes(searchText);
+        }
+        // 纯数字：年份、月份、日期
+        if (/^\d+$/.test(searchText)) {
+            if (searchText.length === 4) return year.includes(searchText);
+            if (searchText.length <= 2) {
+                return month.includes(searchText) || day.includes(searchText);
+            }
+        }
+        return false;
+    };
+
     // 过滤和排序记录
     const filteredRecords = useMemo(() => {
         let result = records;
 
-        // 搜索过滤
+        // 搜索过滤（文字 + 时间）
         if (searchText) {
-            result = result.filter((record) =>
-                record.content.toLowerCase().includes(searchText.toLowerCase()),
-            );
+            const lowerSearch = searchText.toLowerCase();
+            result = result.filter((record) => {
+                const textMatch = record.content.toLowerCase().includes(lowerSearch);
+                const timeMatch = matchTimeFilter(record.timestamp, searchText);
+                return textMatch || timeMatch;
+            });
         }
 
         // 排序：置顶优先，然后按时间倒序
