@@ -9,7 +9,7 @@ import HistoryPage from "../pages/HistoryPage";
 import SettingsPage from "../pages/SettingsPage";
 import AboutPage from "../pages/AboutPage";
 
-const { Header, Content, Sider } = Layout;
+const { Content, Sider } = Layout;
 
 // 菜单项
 const menuItems = [
