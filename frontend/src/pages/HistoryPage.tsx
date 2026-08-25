@@ -10,7 +10,6 @@ import {
     Tooltip,
     message,
     Checkbox,
-    Dropdown,
     Spin,
 } from "antd";
 import {
@@ -18,7 +17,6 @@ import {
     CopyOutlined,
     PushpinOutlined,
     DeleteOutlined,
-    MoreOutlined,
     SelectOutlined,
     CloseCircleOutlined,
     ReloadOutlined,
@@ -55,6 +53,9 @@ function HistoryPage() {
 
     useEffect(() => {
         loadRecords();
+        // 每2秒自动刷新，检测新剪贴板记录
+        const timer = setInterval(loadRecords, 2000);
+        return () => clearInterval(timer);
     }, [loadRecords]);
 
     // 过滤和排序记录
@@ -165,34 +166,6 @@ function HistoryPage() {
             setSelectedIds(filteredRecords.map((r) => r.id));
         }
     };
-
-    // 更多操作菜单
-    const getMoreMenu = (record: ClipRecord) => ({
-        items: [
-            {
-                key: "copy",
-                icon: <CopyOutlined />,
-                label: "复制",
-                onClick: () => handleCopy(record),
-            },
-            {
-                key: "pin",
-                icon: <PushpinOutlined />,
-                label: record.isPinned ? "取消置顶" : "置顶",
-                onClick: () => handleTogglePin(record),
-            },
-            {
-                type: "divider" as const,
-            },
-            {
-                key: "delete",
-                icon: <DeleteOutlined />,
-                label: "删除",
-                danger: true,
-                onClick: () => handleDelete(record),
-            },
-        ],
-    });
 
     return (
         <div>
@@ -335,11 +308,6 @@ function HistoryPage() {
                                                 {record.isPinned && (
                                                     <Tag color="orange">置顶</Tag>
                                                 )}
-                                                {record.type === "text" && (
-                                                    <Tag color="default">
-                                                        {record.content.length} 字符
-                                                    </Tag>
-                                                )}
                                             </Space>
                                         </div>
 
@@ -365,12 +333,14 @@ function HistoryPage() {
                                                         }}
                                                     />
                                                 </Tooltip>
-                                                <Dropdown menu={getMoreMenu(record)} trigger={["click"]}>
+                                                <Tooltip title="删除">
                                                     <Button
                                                         type="text"
-                                                        icon={<MoreOutlined />}
+                                                        danger
+                                                        icon={<DeleteOutlined />}
+                                                        onClick={() => handleDelete(record)}
                                                     />
-                                                </Dropdown>
+                                                </Tooltip>
                                             </Space>
                                         )}
                                     </div>

@@ -91,7 +91,7 @@ pub fn get_records() -> Vec<crate::commands::ClipRecord> {
             content,
             preview,
             file_path,
-            timestamp: chrono::DateTime::from_timestamp_millis(r.timestamp)
+            timestamp: chrono::DateTime::from_timestamp(r.timestamp, 0)
                 .unwrap_or_else(|| chrono::Utc::now())
                 .to_rfc3339(),
             is_pinned: r.is_pinned,
