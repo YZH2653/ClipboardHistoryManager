@@ -4,7 +4,7 @@ mod ffi;
 use tauri::Manager;
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
-use tauri_plugin_global_shortcut::GlobalShortcutExt;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -81,30 +81,34 @@ pub fn run() {
             // 注册全局快捷键
             let app_handle = app.handle().clone();
 
-            // Ctrl+Alt+V: 显示/隐藏窗口
+            // Ctrl+Alt+V: 显示/隐藏窗口（只在按下时触发）
             let app_clone = app_handle.clone();
             let _ = app_handle.global_shortcut().on_shortcut(
                 "CmdOrCtrl+Alt+V",
-                move |_app, _event, _shortcut| {
-                    if let Some(window) = app_clone.get_webview_window("main") {
-                        if window.is_visible().unwrap_or(false) {
-                            let _ = window.hide();
-                        } else {
-                            let _ = window.show();
-                            let _ = window.set_focus();
+                move |_app, _shortcut, event| {
+                    if event.state == ShortcutState::Pressed {
+                        if let Some(window) = app_clone.get_webview_window("main") {
+                            if window.is_visible().unwrap_or(false) {
+                                let _ = window.hide();
+                            } else {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
                         }
                     }
                 },
             );
 
-            // Ctrl+Alt+C: 快速复制最近一条记录
+            // Ctrl+Alt+C: 快速复制最近一条记录（只在按下时触发）
             let app_clone2 = app_handle.clone();
             let _ = app_handle.global_shortcut().on_shortcut(
                 "CmdOrCtrl+Alt+C",
-                move |_app, _event, _shortcut| {
-                    let records = ffi::get_records();
-                    if let Some(record) = records.first() {
-                        let _ = ffi::copy_to_clipboard(&record.content);
+                move |_app, _shortcut, event| {
+                    if event.state == ShortcutState::Pressed {
+                        let records = ffi::get_records();
+                        if let Some(record) = records.first() {
+                            let _ = ffi::copy_to_clipboard(&record.content);
+                        }
                     }
                 },
             );
