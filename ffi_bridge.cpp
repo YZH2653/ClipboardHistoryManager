@@ -73,6 +73,9 @@ static DWORD WINAPI ClipThreadProc (LPVOID lpParam)
 
     if (!G_HiddenWnd) return 1;
 
+    // 关键：初始化ClipboardManager的HWND
+    G_ClipManager.Initialize (G_HiddenWnd);
+
     AddClipboardFormatListener (G_HiddenWnd);
 
     MSG msg;
