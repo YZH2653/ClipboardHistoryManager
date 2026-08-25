@@ -200,9 +200,11 @@ function HistoryPage() {
             <div
                 style={{
                     display: "flex",
+                    flexWrap: "wrap",
                     justifyContent: "space-between",
                     alignItems: "center",
                     marginBottom: 16,
+                    gap: 8,
                 }}
             >
                 <Input
@@ -210,11 +212,11 @@ function HistoryPage() {
                     prefix={<SearchOutlined />}
                     value={searchText}
                     onChange={(e) => setSearchText(e.target.value)}
-                    style={{ width: "100%", maxWidth: 400 }}
+                    style={{ flex: 1, minWidth: 180, maxWidth: 400 }}
                     allowClear
                 />
 
-                <Space>
+                <Space wrap>
                     <Button
                         icon={<ReloadOutlined />}
                         onClick={loadRecords}

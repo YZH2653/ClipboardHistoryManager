@@ -145,13 +145,15 @@ function SettingsPage() {
                 <div
                     style={{
                         display: "flex",
+                        flexWrap: "wrap",
                         justifyContent: "space-between",
                         alignItems: "center",
                         marginBottom: 24,
+                        gap: 8,
                     }}
                 >
                     <h2 style={{ margin: 0 }}>设置</h2>
-                    <Space>
+                    <Space wrap>
                         <Button icon={<ImportOutlined />} onClick={handleImport}>
                             导入
                         </Button>

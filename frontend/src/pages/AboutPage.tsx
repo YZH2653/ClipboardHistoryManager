@@ -43,12 +43,13 @@ function AboutPage() {
                         2026-08-25
                     </Descriptions.Item>
                     <Descriptions.Item label="技术栈">
-                        <Space>
+                        <Space wrap>
                             <Tag color="green">React</Tag>
                             <Tag color="blue">TypeScript</Tag>
                             <Tag color="cyan">Ant Design</Tag>
                             <Tag color="orange">Tauri</Tag>
-                            <Tag color="red">C++</Tag>
+                            <Tag color="red">Rust</Tag>
+                            <Tag color="purple">Vite</Tag>
                         </Space>
                     </Descriptions.Item>
                     <Descriptions.Item label="作者">
@@ -123,12 +124,12 @@ function AboutPage() {
             <Card title="快捷键" style={{ marginBottom: 16 }}>
                 <Descriptions column={1} bordered>
                     <Descriptions.Item label="显示/隐藏窗口">
-                        <Space>
+                        <Space wrap>
                             <Tag>Ctrl</Tag> + <Tag>Alt</Tag> + <Tag>V</Tag>
                         </Space>
                     </Descriptions.Item>
                     <Descriptions.Item label="快速复制最近记录">
-                        <Space>
+                        <Space wrap>
                             <Tag>Ctrl</Tag> + <Tag>Alt</Tag> + <Tag>C</Tag>
                         </Space>
                     </Descriptions.Item>

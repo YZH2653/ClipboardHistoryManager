@@ -1,4 +1,4 @@
-# C++编译产物
+# 编译产物
 *.exe
 *.obj
 *.o
@@ -11,30 +11,25 @@ output/
 bin/
 build/
 
-# VS Code工作区文件
+# VS Code
 .vscode/
 *.code-workspace
 
 # 临时文件
 *.tmp
 *.log
-*.zip
 
 # 本地配置
 .claude/
 
-# 存储数据（本地使用）
+# 运行时数据
 clips/
 
-# 便携版（单独管理）
-portable/
+# 图片资源（MCP 使用）
+Photo/
 
-# 弃用的JSON库
-json.hpp
-
-# 程序运行时生成的文件
-*.json
-!docs/*.json
+# 发布包
+*.zip
 
 # Node.js
 node_modules/
@@ -45,3 +40,6 @@ frontend/src-tauri/target/
 
 # Tauri
 frontend/src-tauri/gen/
+
+# 前端构建产物
+frontend/dist/

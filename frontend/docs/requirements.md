@@ -49,8 +49,8 @@
 
 ## 与后端通信
 
-通过 Tauri 的 invoke 机制与 C++ 后端通信：
+通过 Tauri 的 invoke 机制与 Rust 后端通信：
 
 ```
-前端 → invoke("get_records") → Rust → C++ → 返回数据
+前端 → invoke("get_records") → Rust (rusqlite) → 返回数据
 ```

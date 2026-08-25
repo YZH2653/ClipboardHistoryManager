@@ -5,13 +5,6 @@
 
 ## 技术栈
 
-### 后端（C++）
-- C++17标准
-- MinGW-w64 (GCC) 编译器
-- Win32原生API（不引入Qt等重型库）
-- nlohmann/json（JSON解析库）
-- SQLite3（数据库）
-
 ### 前端（Tauri + React）
 - Tauri 2.x（桌面应用框架）
 - React 18.x（UI 框架）
@@ -19,18 +12,16 @@
 - Ant Design 5.x（UI 组件库）
 - Vite 5.x（构建工具）
 
+### 后端（Rust）
+- rusqlite（SQLite 数据库，bundled 模式）
+- serde / serde_json（序列化）
+- chrono（时间处理）
+- tauri-plugin-shell（系统路径）
+
 ## 项目结构
 ```
-Clipboard History Manager/
-├── Main.cpp                 # 入口点，窗口创建和消息循环
-├── ClipboardManager.h/cpp   # 剪贴板监听和内容捕获
-├── Storage.h/cpp            # 文件存储和管理
-├── UIManager.h/cpp          # 界面绘制和交互
-├── Utils.h/cpp              # 工具函数
-├── clips/                   # 存储目录（自动创建）
-│   ├── history.json         # 历史记录索引
-│   └── images/              # 图片存储
-├── frontend/                # 前端项目（Tauri + React）
+ClipboardHistoryManager/
+├── frontend/                # Tauri + React 应用
 │   ├── src/                 # React 源码
 │   │   ├── components/      # 通用组件
 │   │   ├── pages/           # 页面组件
@@ -39,155 +30,83 @@ Clipboard History Manager/
 │   │   ├── utils/           # 工具函数
 │   │   ├── App.tsx          # 主应用组件
 │   │   └── main.tsx         # 入口文件
-│   ├── src-tauri/           # Tauri Rust 代码
-│   ├── docs/                # 前端文档
-│   │   ├── requirements.md  # 前端需求
-│   │   ├── technical-design.md # 技术设计
-│   │   ├── execution-steps.md # 执行步骤
-│   │   └── code-style.md    # 代码风格规范
-│   ├── package.json         # 依赖配置
-│   └── vite.config.ts       # Vite 配置
+│   ├── src-tauri/           # Tauri Rust 后端
+│   │   ├── src/
+│   │   │   ├── commands.rs  # 所有业务逻辑（CRUD、设置）
+│   │   │   ├── lib.rs       # Tauri 应用注册
+│   │   │   └── main.rs      # 入口
+│   │   ├── Cargo.toml       # Rust 依赖
+│   │   └── tauri.conf.json  # Tauri 配置
+│   ├── dist/                # 前端构建产物
+│   └── package.json         # Node.js 依赖
+├── clips/                   # 运行时数据（自动创建，gitignore）
+│   ├── history.db           # SQLite 数据库
+│   └── images/              # 图片存储
 ├── docs/                    # 项目文档
-│   ├── requirements.md      # 需求文档
-│   ├── technical-design.md  # 技术设计规范
-│   └── execution-steps.md   # 执行步骤
-├── devlogs/                 # 软件开发日志
-│   └── YYYY-MM-DD-*.md      # 按日期记录的开发日志
-├── versions/                # 版本开发目录
-│   ├── README.md            # 版本开发指引
-│   └── X.X.X.X/             # 各版本开发文件夹
-│       ├── README.md        # 版本概述
-│       ├── changelog.md     # 版本更新日志
-│       ├── requirements.md  # 本版本需求
-│       ├── execution-steps.md # 执行步骤
-│       └── devlogs/         # 版本开发日志
-└── output/                  # 编译输出
-    └── ClipboardHistory.exe # 可执行文件
+├── versions/                # 版本历史
+├── devlogs/                 # 开发日志
+├── Photo/                   # 图片资源
+├── .claude/                 # Claude 配置
+├── CLAUDE.md                # 本文件
+└── README.md                # 项目说明
 ```
 
-## 编译命令
+## 开发命令
+
+### 前端开发
 ```bash
-g++ -std=c++17 -o output/ClipboardHistory.exe *.cpp -luser32 -lkernel32 -lgdi32
+cd frontend
+npm install          # 安装依赖
+npm run dev          # 启动开发服务器（Vite HMR）
+npm run build        # 构建前端
 ```
+
+### Tauri 开发
+```bash
+cd frontend
+npm run tauri dev    # 启动 Tauri 开发模式（前端 + Rust 后端热重载）
+npm run tauri build  # 打包 Tauri 应用（产出 .exe 到 src-tauri/target/release/bundle/）
+```
+
+## 架构说明
+
+前端 React 通过 Tauri 的 `invoke()` IPC 机制调用 Rust 后端命令：
+
+```
+React 组件 → invoke("command") → Rust commands.rs → rusqlite → SQLite
+```
+
+### 后端命令（commands.rs）
+| 命令 | 功能 |
+|------|------|
+| `get_records` | 获取所有记录（时间倒序） |
+| `get_record_content` | 获取记录内容（用于复制） |
+| `delete_record` | 删除单条记录 |
+| `toggle_pin` | 切换置顶状态 |
+| `batch_delete_records` | 批量删除记录 |
+| `get_settings` | 获取设置 |
+| `save_settings` | 保存设置 |
+| `clear_all_records` | 清空所有记录 |
 
 ## 开发规范
 
 ### 代码风格
-- 缩进：4个空格
-- 大括号：Allman风格（左大括号单独换行）
-- 注释：单行注释，简短说明功能
-- 使用 `using namespace std;`
-
-### 命名规范
-- 类名：PascalCase（如 `ClipboardManager`）
-- 函数名：PascalCase（如 `OnClipboardUpdate`）
-- 变量名：PascalCase（如 `ClipRecord`）
-- 常量：UPPER_SNAKE_CASE（如 `MAX_RECORDS`）
-- 全局变量：G_前缀（如 `G_hWnd`）
-
-### 编码要求
-- 必须添加 `#define UNICODE` 和 `#define _UNICODE`
-- 支持中文字符集
-- main函数末尾必须写 `return 0;`
-
-## 开发流程
-
-### 阶段划分（软件初始开发）
-1. **基础框架**：窗口创建和编译配置 ✅
-2. **剪贴板监听**：文字和图片捕获 ✅
-3. **存储系统**：JSON读写和文件管理 ✅
-4. **界面交互**：列表、搜索、置顶、删除 ✅
-5. **测试优化**：功能测试和打包 ✅
-
-### 版本更新流程（v1.1.0.0起）
-1. **创建分支**：从 main 创建版本分支 `git checkout -b X.X.X.X`
-2. **编写文档**：在 `versions/X.X.X.X/` 下创建需求、执行步骤等文档
-3. **逐步开发**：按执行步骤逐步实现，每完成一步提交一次
-4. **测试验证**：功能开发完成后进行全面测试
-5. **合并主干**：测试无误后合并到 main 分支
-
-### 工作要求
-- 每完成一个阶段，更新版本开发日志（versions/X.X.X.X/devlogs/）
-- 每完成一个阶段，提交到Git仓库
-- 按照 versions/X.X.X.X/execution-steps.md 中的步骤执行
-- 遇到问题及时记录到版本开发日志
-- 软件初始开发日志和版本更新日志分开存放
-
-## 依赖库
-
-### 必需
-- Windows API（user32, kernel32, gdi32, shell32）
-- nlohmann/json（单头文件，需下载到项目目录）
-
-### 下载nlohmann/json
-```bash
-# 下载单头文件到项目根目录
-curl -L https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp -o json.hpp
-```
-
-## 功能需求
-- 自动监听剪贴板变化
-- 支持文字内容（最大10000字符）
-- 支持图片内容（PNG格式保存）
-- 历史记录最多1000条
-- 存储期限：1天、3天、5天、7天、30天、永久
-- 实时清理过期内容
-- 时间降序排列
-- 支持搜索、置顶、删除、再次粘贴
-
-## 性能要求
-- 启动时间：< 1秒
-- 复制响应时间：< 100ms
-- 搜索响应时间：< 200ms
-- 内存占用：< 50MB
-
-## 重要文件路径
-
-### 软件初始开发文档
-- 需求文档：docs/requirements.md
-- 技术设计：docs/technical-design.md
-- 执行步骤：docs/execution-steps.md
-- 开发日志：devlogs/YYYY-MM-DD-*.md
-- 编译配置：.vscode/c_cpp_properties.json
-
-### 版本更新文档（以 X.X.X.X 为版本号）
-- 版本开发指引：versions/README.md
-- 版本概述：versions/X.X.X.X/README.md
-- 版本需求：versions/X.X.X.X/requirements.md
-- 版本执行步骤：versions/X.X.X.X/execution-steps.md
-- 版本更新日志：versions/X.X.X.X/changelog.md
-- 版本开发日志：versions/X.X.X.X/devlogs/YYYY-MM-DD.md
-
-### 前端开发文档
-- 前端需求：frontend/docs/requirements.md
-- 前端技术设计：frontend/docs/technical-design.md
-- 前端执行步骤：frontend/docs/execution-steps.md
-- 前端代码风格：frontend/docs/code-style.md
-
-## 前端开发指南
-
-### 开发环境
-- Node.js 18+ (LTS)
-- Rust (rustup)
-- VS Code 插件：ES7+ React/Redux/React-Native snippets, Prettier, ESLint
-
-### 开发命令
-```bash
-cd frontend
-npm install          # 安装依赖
-npm run dev          # 启动开发服务器
-npm run build        # 构建前端
-npm run tauri dev    # 启动 Tauri 开发模式
-npm run tauri build  # 打包 Tauri 应用
-```
-
-### 代码风格
 - React 函数组件 + TypeScript
 - Ant Design 组件库
-- 详细规范见 frontend/docs/code-style.md
+- 4空格缩进
+- 单行注释，简短说明功能
 
-### 与后端通信
-通过 Tauri 的 invoke 机制与 C++ 后端通信：
-```
-前端 → invoke("command") → Rust → C++ → 返回数据
-```
+### 命名规范
+- 组件：PascalCase（如 `HistoryPage`、`MainLayout`）
+- 函数：camelCase（如 `handleCopy`、`loadRecords`）
+- 类型：PascalCase（如 `ClipRecord`、`Settings`）
+
+### Git 工作流
+- 每个版本创建独立分支 `vX.Y.Z.W`
+- 测试通过后合并到 main
+- 打版本标签
+
+## 系统要求
+- Windows 7/8/10/11
+- Node.js 18+ (LTS)
+- Rust (rustup)

@@ -68,7 +68,7 @@ function MainLayout() {
                     style={{ borderRight: 0 }}
                 />
             </Sider>
-            <Layout>
+            <Layout style={{ overflow: "hidden" }}>
                 <Content
                     style={{
                         margin: 24,
@@ -76,6 +76,7 @@ function MainLayout() {
                         background: "#fff",
                         borderRadius: 8,
                         minHeight: 280,
+                        overflow: "auto",
                     }}
                 >
                     <PageComponent />
