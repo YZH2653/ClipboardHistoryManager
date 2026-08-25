@@ -10,6 +10,7 @@ using namespace std;
 static ClipboardManager G_ClipManager;
 static Storage G_Storage;
 static vector<ClipRecord> G_Records;
+static CRITICAL_SECTION G_RecordsLock;
 static bool G_Initialized = false;
 static HWND G_HiddenWnd = NULL;
 static HANDLE G_ClipThread = NULL;
@@ -44,9 +45,11 @@ static LRESULT CALLBACK HiddenWndProc (
 {
     if (msg == WM_CLIPBOARDUPDATE)
     {
+        EnterCriticalSection (&G_RecordsLock);
         G_ClipManager.OnClipboardUpdate ();
         G_Records = G_ClipManager.GetRecords ();
         G_Storage.SaveRecords (G_Records);
+        LeaveCriticalSection (&G_RecordsLock);
         return 0;
     }
     if (msg == WM_DESTROY)
@@ -117,6 +120,8 @@ bool FfiInitialize (const char* rootDirUtf8)
 {
     if (G_Initialized) return true;
 
+    InitializeCriticalSection (&G_RecordsLock);
+
     wstring rootDir = Utf8ToWstring (string (rootDirUtf8));
 
     G_Storage.SetRootDir (rootDir);
@@ -165,6 +170,7 @@ void FfiShutdown ()
 
     G_Storage.SaveRecords (G_Records);
     G_ClipManager.ShutdownGdiplus ();
+    DeleteCriticalSection (&G_RecordsLock);
     G_Initialized = false;
 }
 
@@ -172,6 +178,7 @@ void FfiShutdown ()
 extern "C" __declspec(dllexport)
 int FfiGetRecords (FFIRecord* outRecords, int maxCount)
 {
+    EnterCriticalSection (&G_RecordsLock);
     int count = min ((int)G_Records.size (), maxCount);
     for (int i = 0; i < count; i++)
     {
@@ -194,6 +201,7 @@ int FfiGetRecords (FFIRecord* outRecords, int maxCount)
         outRecords[i].Timestamp = r.timestamp;
         outRecords[i].IsPinned = r.isPinned;
     }
+    LeaveCriticalSection (&G_RecordsLock);
     return count;
 }
 
@@ -209,13 +217,16 @@ bool FfiCopyToClipboard (const char* textUtf8)
 extern "C" __declspec(dllexport)
 bool FfiCopyRecord (int64_t id)
 {
+    EnterCriticalSection (&G_RecordsLock);
     for (const auto& r : G_Records)
     {
         if (r.id == id)
         {
+            LeaveCriticalSection (&G_RecordsLock);
             return G_ClipManager.CopyToClipboard (r.content);
         }
     }
+    LeaveCriticalSection (&G_RecordsLock);
     return false;
 }
 
@@ -223,6 +234,7 @@ bool FfiCopyRecord (int64_t id)
 extern "C" __declspec(dllexport)
 bool FfiDeleteRecord (int64_t id)
 {
+    EnterCriticalSection (&G_RecordsLock);
     for (auto it = G_Records.begin (); it != G_Records.end (); ++it)
     {
         if (it->id == id)
@@ -230,9 +242,11 @@ bool FfiDeleteRecord (int64_t id)
             G_Storage.DeleteRecordFile (*it);
             G_Records.erase (it);
             G_Storage.SaveRecords (G_Records);
+            LeaveCriticalSection (&G_RecordsLock);
             return true;
         }
     }
+    LeaveCriticalSection (&G_RecordsLock);
     return false;
 }
 
@@ -240,15 +254,18 @@ bool FfiDeleteRecord (int64_t id)
 extern "C" __declspec(dllexport)
 bool FfiTogglePin (int64_t id)
 {
+    EnterCriticalSection (&G_RecordsLock);
     for (auto& r : G_Records)
     {
         if (r.id == id)
         {
             r.isPinned = !r.isPinned;
             G_Storage.SaveRecords (G_Records);
+            LeaveCriticalSection (&G_RecordsLock);
             return r.isPinned;
         }
     }
+    LeaveCriticalSection (&G_RecordsLock);
     return false;
 }
 
@@ -256,6 +273,7 @@ bool FfiTogglePin (int64_t id)
 extern "C" __declspec(dllexport)
 int FfiBatchDelete (const int64_t* ids, int count)
 {
+    EnterCriticalSection (&G_RecordsLock);
     int deleted = 0;
     for (int i = 0; i < count; i++)
     {
@@ -271,6 +289,7 @@ int FfiBatchDelete (const int64_t* ids, int count)
         }
     }
     if (deleted > 0) G_Storage.SaveRecords (G_Records);
+    LeaveCriticalSection (&G_RecordsLock);
     return deleted;
 }
 
@@ -278,12 +297,14 @@ int FfiBatchDelete (const int64_t* ids, int count)
 extern "C" __declspec(dllexport)
 void FfiClearAll ()
 {
+    EnterCriticalSection (&G_RecordsLock);
     for (auto& r : G_Records)
     {
         G_Storage.DeleteRecordFile (r);
     }
     G_Records.clear ();
     G_Storage.SaveRecords (G_Records);
+    LeaveCriticalSection (&G_RecordsLock);
 }
 
 // 获取设置
