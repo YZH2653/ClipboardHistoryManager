@@ -456,9 +456,8 @@ int ClipboardManager::GetRecordCount () const
     return m_records.size ();
 }
 
-// 清空内部记录
+// 清空内部记录（保留m_lastContent用于去重）
 void ClipboardManager::ClearRecords ()
 {
     m_records.clear ();
-    m_lastContent.clear ();
 }

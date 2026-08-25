@@ -11,6 +11,7 @@ import {
     message,
     Checkbox,
     Spin,
+    FloatButton,
 } from "antd";
 import {
     SearchOutlined,
@@ -356,6 +357,10 @@ function HistoryPage() {
                     )
                 )}
             </Spin>
+            <FloatButton.BackTop
+                style={{ right: 24, bottom: 24 }}
+                visibilityHeight={200}
+            />
         </div>
     );
 }
