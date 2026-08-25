@@ -12,101 +12,96 @@
 - Ant Design 5.x（UI 组件库）
 - Vite 5.x（构建工具）
 
-### 后端（Rust）
-- rusqlite（SQLite 数据库，bundled 模式）
-- serde / serde_json（序列化）
-- chrono（时间处理）
-- tauri-plugin-shell（系统路径）
+### 后端（C++ FFI）
+- C++17 标准
+- MinGW-w64 (GCC) 编译器
+- Win32 API（剪贴板监听 `AddClipboardFormatListener`）
+- SQLite3（数据存储）
+- nlohmann/json（JSON 解析）
+- GDI+（图片捕获）
+
+### 桥接层（Rust FFI）
+- Rust 通过 `extern "C"` 调用 C++ 后端
+- `cc` crate 自动编译 C++ 源文件
+- `CRITICAL_SECTION` 保证线程安全
 
 ## 项目结构
 ```
 ClipboardHistoryManager/
 ├── frontend/                # Tauri + React 应用
 │   ├── src/                 # React 源码
-│   │   ├── components/      # 通用组件
-│   │   ├── pages/           # 页面组件
-│   │   ├── styles/          # 样式文件
+│   │   ├── components/      # 通用组件（MainLayout）
+│   │   ├── pages/           # 页面（HistoryPage、SettingsPage、AboutPage）
+│   │   ├── styles/          # 全局样式
 │   │   ├── types/           # TypeScript 类型
-│   │   ├── utils/           # 工具函数
-│   │   ├── App.tsx          # 主应用组件
-│   │   └── main.tsx         # 入口文件
-│   ├── src-tauri/           # Tauri Rust 后端
+│   │   └── utils/           # API 封装
+│   ├── src-tauri/           # Rust 桥接层
 │   │   ├── src/
-│   │   │   ├── commands.rs  # 所有业务逻辑（CRUD、设置）
-│   │   │   ├── lib.rs       # Tauri 应用注册
+│   │   │   ├── commands.rs  # Tauri 命令（调用 FFI）
+│   │   │   ├── ffi.rs       # FFI 绑定（调用 C++）
+│   │   │   ├── lib.rs       # 应用注册 + 托盘
 │   │   │   └── main.rs      # 入口
-│   │   ├── Cargo.toml       # Rust 依赖
+│   │   ├── build.rs         # 自动编译 C++（cc crate）
 │   │   └── tauri.conf.json  # Tauri 配置
-│   ├── dist/                # 前端构建产物
 │   └── package.json         # Node.js 依赖
-├── clips/                   # 运行时数据（自动创建，gitignore）
+├── ffi_bridge.cpp           # FFI 桥接层（线程安全）
+├── ClipboardManager.h/cpp   # 剪贴板监听和内容捕获
+├── Storage.h/cpp            # SQLite 存储管理
+├── sqlite3.h/c              # SQLite 引擎
+├── json.hpp                 # nlohmann JSON
+├── clips/                   # 运行时数据（gitignore）
 │   ├── history.db           # SQLite 数据库
 │   └── images/              # 图片存储
 ├── docs/                    # 项目文档
 ├── versions/                # 版本历史
-├── devlogs/                 # 开发日志
-├── Photo/                   # 图片资源
-├── .claude/                 # Claude 配置
-├── CLAUDE.md                # 本文件
-└── README.md                # 项目说明
-```
-
-## 开发命令
-
-### 前端开发
-```bash
-cd frontend
-npm install          # 安装依赖
-npm run dev          # 启动开发服务器（Vite HMR）
-npm run build        # 构建前端
-```
-
-### Tauri 开发
-```bash
-cd frontend
-npm run tauri dev    # 启动 Tauri 开发模式（前端 + Rust 后端热重载）
-npm run tauri build  # 打包 Tauri 应用（产出 .exe 到 src-tauri/target/release/bundle/）
+└── devlogs/                 # 开发日志
 ```
 
 ## 架构说明
 
-前端 React 通过 Tauri 的 `invoke()` IPC 机制调用 Rust 后端命令：
-
 ```
-React 组件 → invoke("command") → Rust commands.rs → rusqlite → SQLite
+React 前端 → Tauri invoke → Rust commands.rs → ffi.rs → C++ ffi_bridge.cpp → ClipboardManager/Storage
 ```
 
-### 后端命令（commands.rs）
-| 命令 | 功能 |
-|------|------|
-| `get_records` | 获取所有记录（时间倒序） |
-| `get_record_content` | 获取记录内容（用于复制） |
-| `delete_record` | 删除单条记录 |
-| `toggle_pin` | 切换置顶状态 |
-| `batch_delete_records` | 批量删除记录 |
-| `get_settings` | 获取设置 |
-| `save_settings` | 保存设置 |
-| `clear_all_records` | 清空所有记录 |
+### 数据流
+1. 剪贴板变化 → `WM_CLIPBOARDUPDATE` → C++ 监听线程捕获 → 保存到 SQLite
+2. 前端每 2 秒轮询 → Rust FFI → 读取记录 → 更新 UI
+3. 用户操作（删除/置顶）→ Rust FFI → C++ 修改 → 保存到 SQLite
+
+### 线程安全
+- C++ 使用 `CRITICAL_SECTION` 保护 `G_Records`
+- 剪贴板监听线程和主线程互斥访问共享数据
+- 监听回调先检查去重再捕获，防止复制按钮触发重复记录
+
+## 开发命令
+
+### 构建
+```bash
+cd frontend
+npm run tauri build    # 打包应用（自动编译 C++ + Rust + React）
+```
+
+### 开发
+```bash
+cd frontend
+npm run tauri dev      # 开发模式（热重载）
+```
 
 ## 开发规范
 
-### 代码风格
-- React 函数组件 + TypeScript
-- Ant Design 组件库
-- 4空格缩进
-- 单行注释，简短说明功能
+### C++ 代码风格
+- 缩进：4 个空格
+- 大括号：Allman 风格（左大括号单独换行）
+- 命名：PascalCase（函数、变量）
+- 全局变量：G_ 前缀
+- 注释：单行，≤30 字符
 
-### 命名规范
-- 组件：PascalCase（如 `HistoryPage`、`MainLayout`）
-- 函数：camelCase（如 `handleCopy`、`loadRecords`）
-- 类型：PascalCase（如 `ClipRecord`、`Settings`）
+### TypeScript/React 代码风格
+- 函数组件 + TypeScript
+- Ant Design 组件库
+- camelCase 命名
 
 ### Git 工作流
 - 每个版本创建独立分支 `vX.Y.Z.W`
 - 测试通过后合并到 main
 - 打版本标签
-
-## 系统要求
-- Windows 7/8/10/11
-- Node.js 18+ (LTS)
-- Rust (rustup)

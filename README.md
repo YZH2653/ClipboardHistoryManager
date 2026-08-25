@@ -11,8 +11,9 @@
 - **删除功能**：不需要的记录可以手动删除，支持批量删除
 - **快速复制**：点击卡片即可复制内容到剪贴板
 - **过期清理**：自动清理超过保留期限的记录
+- **系统托盘**：关闭窗口时最小化到系统托盘，双击恢复
+- **单实例**：防止重复打开，再次启动时恢复已有窗口
 - **设置管理**：保留天数、最大记录数、开机自启等配置
-- **便携使用**：绿色软件，无需安装，可直接放在U盘使用
 
 ## 🚀 快速开始
 
@@ -21,6 +22,7 @@
 - Windows 7/8/10/11
 - [Node.js 18+](https://nodejs.org/) (LTS)
 - [Rust](https://rustup.rs/) (通过 rustup 安装)
+- [MinGW-w64](https://www.mingw-w64.org/) (GCC 编译器)
 
 ### 开发运行
 
@@ -31,7 +33,7 @@ cd frontend
 # 安装依赖
 npm install
 
-# 启动开发模式（前端 + Rust 后端热重载）
+# 启动开发模式
 npm run tauri dev
 ```
 
@@ -42,7 +44,7 @@ cd frontend
 npm run tauri build
 ```
 
-打包后的 `.exe` 文件位于 `frontend/src-tauri/target/release/bundle/`
+打包后的文件位于 `frontend/src-tauri/target/release/bundle/`
 
 ## 📁 项目结构
 
@@ -50,21 +52,14 @@ npm run tauri build
 ClipboardHistoryManager/
 ├── frontend/                # Tauri + React 应用
 │   ├── src/                 # React 源码
-│   │   ├── components/      # 通用组件（MainLayout）
-│   │   ├── pages/           # 页面（HistoryPage、SettingsPage、AboutPage）
-│   │   ├── styles/          # 全局样式
-│   │   ├── types/           # TypeScript 类型定义
-│   │   └── utils/           # API 封装（invoke 调用）
-│   ├── src-tauri/           # Rust 后端
-│   │   └── src/
-│   │       ├── commands.rs  # 业务逻辑（CRUD、设置管理）
-│   │       ├── lib.rs       # Tauri 应用注册
-│   │       └── main.rs      # 入口
-│   ├── dist/                # 前端构建产物
+│   ├── src-tauri/           # Rust 桥接层
 │   └── package.json         # Node.js 依赖
-├── clips/                   # 运行时数据（自动创建）
-│   ├── history.db           # SQLite 数据库
-│   └── images/              # 图片存储
+├── ffi_bridge.cpp           # C++ FFI 桥接层
+├── ClipboardManager.h/cpp   # 剪贴板监听（Win32 API）
+├── Storage.h/cpp            # SQLite 存储管理
+├── sqlite3.h/c              # SQLite 引擎
+├── json.hpp                 # JSON 解析库
+├── clips/                   # 运行时数据
 ├── docs/                    # 项目文档
 ├── versions/                # 版本历史
 └── devlogs/                 # 开发日志
@@ -72,15 +67,25 @@ ClipboardHistoryManager/
 
 ## 🛠️ 技术栈
 
-| 层级 | 技术 | 版本 |
+| 层级 | 技术 | 用途 |
 |------|------|------|
-| 桌面框架 | Tauri | 2.x |
-| 前端 UI | React + Ant Design | 18.x / 5.x |
-| 类型系统 | TypeScript | 5.x |
-| 构建工具 | Vite | 5.x |
-| 后端语言 | Rust | - |
-| 数据库 | SQLite (rusqlite) | bundled |
-| 序列化 | serde / serde_json | - |
+| 前端 UI | React + Ant Design | 界面展示和交互 |
+| 桌面框架 | Tauri 2.x | 窗口管理和系统集成 |
+| 桥接层 | Rust FFI | 连接前端和 C++ 后端 |
+| 后端核心 | C++17 + Win32 API | 剪贴板监听和数据处理 |
+| 数据库 | SQLite3 | 本地数据存储 |
+| 图片处理 | GDI+ | 截图捕获和保存 |
+
+## 架构
+
+```
+React 前端 → Tauri invoke → Rust FFI → C++ 后端
+                                    ↓
+                              剪贴板监听线程
+                              (AddClipboardFormatListener)
+                                    ↓
+                              SQLite 数据库
+```
 
 ## 🔍 搜索格式
 
@@ -94,7 +99,7 @@ ClipboardHistoryManager/
 
 ## ⚙️ 配置说明
 
-- **保留天数**：默认保留最近3天的记录（可选3天/5天/7天/30天/永久）
+- **保留天数**：默认保留最近3天的记录（可选1天/3天/5天/7天/30天/永久）
 - **最大记录数**：默认最多保存1000条记录
 - **开机自启**：通过 Windows 注册表实现
 - **最小化到托盘**：默认开启
@@ -102,29 +107,23 @@ ClipboardHistoryManager/
 ## 📝 更新日志
 
 ### v2.0.0 (2026-08-25)
-- ✨ 全新 Tauri + React 架构，替代 v1.x Win32 原生版本
+- ✨ 全新 Tauri + React 架构
+- ✨ C++ 后端通过 FFI 桥接
 - ✨ 现代化 UI 设计（Ant Design）
-- ✨ Rust 后端，性能更优
-- ✨ 响应式布局，支持窗口缩放
-- ✨ 批量删除、全选功能
-- ✨ 设置页面独立管理
+- ✨ 系统托盘集成
+- ✨ 单实例防止重复打开
+- ✨ 自动刷新（每2秒轮询）
+- ✨ 线程安全的剪贴板监听
 
 ### v1.9.0 (2026-08-23)
-- ✨ Ctrl+Alt+V 快速显示/隐藏窗口
-- ✨ Ctrl+Alt+C 快速复制最近记录
-- ✨ 防止重复打开程序
+- ✨ 全局快捷键支持
+- ✨ 防重复打开功能
 
-### v1.8.0 (2026-08-23)
-- 🔧 GDI对象缓存，双缓冲绘制，消除界面闪烁
-- 🔧 筛选结果缓存，提升响应速度
-
-### v1.7.0 (2026-08-14)
-- ✨ 新增自动清理规则功能
-- ✨ 支持按时间、数量、大小清理
-
-### v1.0.0 ~ v1.6.0 (2026-05 ~ 2026-06)
-- ✨ 初始版本，Win32 原生 UI
-- ✨ 系统托盘、开机自启、批量删除
+### v1.0.0 ~ v1.8.0 (2026-05 ~ 2026-08)
+- ✨ Win32 原生 UI
+- ✨ 剪贴板监听和记录
+- ✨ 系统托盘、开机自启
+- ✨ 批量删除、清理规则
 
 ## 📄 许可证
 
