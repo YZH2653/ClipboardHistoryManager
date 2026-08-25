@@ -6,8 +6,6 @@
         "core:default",
         "shell:allow-open",
         "notification:default",
-        "global-shortcut:default",
-        "clipboard-manager:allow-write-text",
-        "clipboard-manager:allow-read-text"
+        "global-shortcut:default"
     ]
 }
