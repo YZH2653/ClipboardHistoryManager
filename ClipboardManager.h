@@ -56,6 +56,9 @@ public:
     // 获取记录数量
     int GetRecordCount () const;
 
+    // 清空内部记录（不删文件）
+    void ClearRecords ();
+
     // 复制内容到剪贴板
     bool CopyToClipboard (const wstring& content);
 

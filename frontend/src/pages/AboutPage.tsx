@@ -67,14 +67,15 @@ function AboutPage() {
                         </Space>
                     </Descriptions.Item>
                     <Descriptions.Item label="GitHub">
-                        <Button
-                            type="link"
-                            icon={<GithubOutlined />}
-                            onClick={() => window.open("https://github.com/YZH2653/ClipboardHistoryManager", "_blank")}
-                            style={{ padding: 0 }}
+                        <a
+                            href="https://github.com/YZH2653/ClipboardHistoryManager"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: "#1890ff" }}
                         >
+                            <GithubOutlined style={{ marginRight: 6 }} />
                             ClipboardHistoryManager
-                        </Button>
+                        </a>
                     </Descriptions.Item>
                 </Descriptions>
             </Card>

@@ -46,9 +46,19 @@ static LRESULT CALLBACK HiddenWndProc (
     if (msg == WM_CLIPBOARDUPDATE)
     {
         EnterCriticalSection (&G_RecordsLock);
+        int oldCount = G_ClipManager.GetRecordCount ();
         G_ClipManager.OnClipboardUpdate ();
-        G_Records = G_ClipManager.GetRecords ();
-        G_Storage.SaveRecords (G_Records);
+        int newCount = G_ClipManager.GetRecordCount ();
+        // 只提取新增的记录，不覆盖G_Records
+        if (newCount > oldCount)
+        {
+            const auto& all = G_ClipManager.GetRecords ();
+            // 新记录在开头
+            G_Records.insert (G_Records.begin (), all[0]);
+            G_Storage.SaveRecords (G_Records);
+        }
+        // 清理G_ClipManager内部记录，防止旧数据残留
+        G_ClipManager.ClearRecords ();
         LeaveCriticalSection (&G_RecordsLock);
         return 0;
     }

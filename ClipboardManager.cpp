@@ -455,3 +455,10 @@ int ClipboardManager::GetRecordCount () const
 {
     return m_records.size ();
 }
+
+// 清空内部记录
+void ClipboardManager::ClearRecords ()
+{
+    m_records.clear ();
+    m_lastContent.clear ();
+}
