@@ -182,8 +182,6 @@ function SettingsPage() {
                         maxRecords: 1000,
                         autoStart: false,
                         minimizeToTray: true,
-                        hotkeyToggle: "ctrl+alt+v",
-                        hotkeyCopy: "ctrl+alt+c",
                     }}
                 >
                     {/* 基本设置 */}
@@ -221,78 +219,10 @@ function SettingsPage() {
 
                     {/* 快捷键设置 */}
                     <Card title="快捷键设置" style={{ marginBottom: 16 }}>
-                        <Form.Item
-                            label="显示/隐藏窗口"
-                            name="hotkeyToggle"
-                            tooltip="快速显示或隐藏主窗口"
-                        >
-                            <Select
-                                options={[
-                                    {
-                                        value: "ctrl+alt+v",
-                                        label: (
-                                            <Space>
-                                                <Tag>Ctrl</Tag> + <Tag>Alt</Tag> +{" "}
-                                                <Tag>V</Tag>
-                                            </Space>
-                                        ),
-                                    },
-                                    {
-                                        value: "ctrl+shift+v",
-                                        label: (
-                                            <Space>
-                                                <Tag>Ctrl</Tag> + <Tag>Shift</Tag> +{" "}
-                                                <Tag>V</Tag>
-                                            </Space>
-                                        ),
-                                    },
-                                    {
-                                        value: "alt+v",
-                                        label: (
-                                            <Space>
-                                                <Tag>Alt</Tag> + <Tag>V</Tag>
-                                            </Space>
-                                        ),
-                                    },
-                                ]}
-                            />
-                        </Form.Item>
-
-                        <Form.Item
-                            label="快速复制最近记录"
-                            name="hotkeyCopy"
-                            tooltip="快速复制最近一条文字记录"
-                        >
-                            <Select
-                                options={[
-                                    {
-                                        value: "ctrl+alt+c",
-                                        label: (
-                                            <Space>
-                                                <Tag>Ctrl</Tag> + <Tag>Alt</Tag> +{" "}
-                                                <Tag>C</Tag>
-                                            </Space>
-                                        ),
-                                    },
-                                    {
-                                        value: "ctrl+shift+c",
-                                        label: (
-                                            <Space>
-                                                <Tag>Ctrl</Tag> + <Tag>Shift</Tag> +{" "}
-                                                <Tag>C</Tag>
-                                            </Space>
-                                        ),
-                                    },
-                                    {
-                                        value: "alt+c",
-                                        label: (
-                                            <Space>
-                                                <Tag>Alt</Tag> + <Tag>C</Tag>
-                                            </Space>
-                                        ),
-                                    },
-                                ]}
-                            />
+                        <Form.Item label="显示/隐藏窗口">
+                            <Space>
+                                <Tag>Ctrl</Tag> + <Tag>Alt</Tag> + <Tag>V</Tag>
+                            </Space>
                         </Form.Item>
                     </Card>
 

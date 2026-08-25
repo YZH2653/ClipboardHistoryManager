@@ -141,8 +141,6 @@ pub fn get_settings() -> crate::commands::Settings {
         max_records: ffi_settings.max_records as i64,
         auto_start: ffi_settings.auto_start,
         minimize_to_tray: ffi_settings.minimize_to_tray,
-        hotkey_toggle: "ctrl+alt+v".to_string(),
-        hotkey_copy: "ctrl+alt+c".to_string(),
     }
 }
 

@@ -26,10 +26,6 @@ pub struct Settings {
     pub auto_start: bool,
     #[serde(rename = "minimizeToTray")]
     pub minimize_to_tray: bool,
-    #[serde(rename = "hotkeyToggle")]
-    pub hotkey_toggle: String,
-    #[serde(rename = "hotkeyCopy")]
-    pub hotkey_copy: String,
 }
 
 // 获取所有记录（通过C++ FFI）
