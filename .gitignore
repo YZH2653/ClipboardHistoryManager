@@ -35,3 +35,13 @@ json.hpp
 # 程序运行时生成的文件
 *.json
 !docs/*.json
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Rust
+frontend/src-tauri/target/
+
+# Tauri
+frontend/src-tauri/gen/
