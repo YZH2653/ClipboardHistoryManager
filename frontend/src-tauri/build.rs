@@ -1,7 +1,12 @@
 fn main() {
-    // 链接C++静态库
-    println!("cargo:rustc-link-search=native=../../");
+    // 链接C++静态库（项目根目录）
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+    let root_dir = std::path::Path::new(&manifest_dir).parent().unwrap().parent().unwrap();
+    println!("cargo:rustc-link-search=native={}", root_dir.display());
     println!("cargo:rustc-link-lib=static=clipboard");
+
+    // 链接C++标准库
+    println!("cargo:rustc-link-lib=stdc++");
 
     // 链接Windows系统库
     println!("cargo:rustc-link-lib=user32");

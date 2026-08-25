@@ -4,6 +4,7 @@ use std::os::raw::c_char;
 
 // C 兼容记录结构
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct FFIRecord {
     pub id: i64,
     pub record_type: i32,
