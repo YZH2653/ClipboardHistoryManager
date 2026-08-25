@@ -4,10 +4,20 @@
 一个运行在Windows平台上的历史剪贴板软件，自动记录用户的复制内容，支持查看、搜索、管理历史记录。
 
 ## 技术栈
+
+### 后端（C++）
 - C++17标准
 - MinGW-w64 (GCC) 编译器
 - Win32原生API（不引入Qt等重型库）
 - nlohmann/json（JSON解析库）
+- SQLite3（数据库）
+
+### 前端（Tauri + React）
+- Tauri 2.x（桌面应用框架）
+- React 18.x（UI 框架）
+- TypeScript 5.x（类型安全）
+- Ant Design 5.x（UI 组件库）
+- Vite 5.x（构建工具）
 
 ## 项目结构
 ```
@@ -20,6 +30,23 @@ Clipboard History Manager/
 ├── clips/                   # 存储目录（自动创建）
 │   ├── history.json         # 历史记录索引
 │   └── images/              # 图片存储
+├── frontend/                # 前端项目（Tauri + React）
+│   ├── src/                 # React 源码
+│   │   ├── components/      # 通用组件
+│   │   ├── pages/           # 页面组件
+│   │   ├── styles/          # 样式文件
+│   │   ├── types/           # TypeScript 类型
+│   │   ├── utils/           # 工具函数
+│   │   ├── App.tsx          # 主应用组件
+│   │   └── main.tsx         # 入口文件
+│   ├── src-tauri/           # Tauri Rust 代码
+│   ├── docs/                # 前端文档
+│   │   ├── requirements.md  # 前端需求
+│   │   ├── technical-design.md # 技术设计
+│   │   ├── execution-steps.md # 执行步骤
+│   │   └── code-style.md    # 代码风格规范
+│   ├── package.json         # 依赖配置
+│   └── vite.config.ts       # Vite 配置
 ├── docs/                    # 项目文档
 │   ├── requirements.md      # 需求文档
 │   ├── technical-design.md  # 技术设计规范
@@ -130,3 +157,37 @@ curl -L https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp -o j
 - 版本执行步骤：versions/X.X.X.X/execution-steps.md
 - 版本更新日志：versions/X.X.X.X/changelog.md
 - 版本开发日志：versions/X.X.X.X/devlogs/YYYY-MM-DD.md
+
+### 前端开发文档
+- 前端需求：frontend/docs/requirements.md
+- 前端技术设计：frontend/docs/technical-design.md
+- 前端执行步骤：frontend/docs/execution-steps.md
+- 前端代码风格：frontend/docs/code-style.md
+
+## 前端开发指南
+
+### 开发环境
+- Node.js 18+ (LTS)
+- Rust (rustup)
+- VS Code 插件：ES7+ React/Redux/React-Native snippets, Prettier, ESLint
+
+### 开发命令
+```bash
+cd frontend
+npm install          # 安装依赖
+npm run dev          # 启动开发服务器
+npm run build        # 构建前端
+npm run tauri dev    # 启动 Tauri 开发模式
+npm run tauri build  # 打包 Tauri 应用
+```
+
+### 代码风格
+- React 函数组件 + TypeScript
+- Ant Design 组件库
+- 详细规范见 frontend/docs/code-style.md
+
+### 与后端通信
+通过 Tauri 的 invoke 机制与 C++ 后端通信：
+```
+前端 → invoke("command") → Rust → C++ → 返回数据
+```
