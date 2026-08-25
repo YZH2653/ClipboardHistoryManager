@@ -4,6 +4,7 @@ mod ffi;
 use tauri::Manager;
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -12,6 +13,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
@@ -103,11 +105,11 @@ pub fn run() {
             let app_clone2 = app_handle.clone();
             let _ = app_handle.global_shortcut().on_shortcut(
                 "CmdOrCtrl+Alt+C",
-                move |_app, _shortcut, event| {
+                move |app, _shortcut, event| {
                     if event.state == ShortcutState::Pressed {
                         let records = ffi::get_records();
                         if let Some(record) = records.first() {
-                            let _ = ffi::copy_to_clipboard(&record.content);
+                            let _ = app.clipboard().write_text(record.content.clone());
                         }
                     }
                 },
