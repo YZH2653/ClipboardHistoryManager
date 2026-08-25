@@ -2,6 +2,7 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
+
 // C 兼容记录结构
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -29,8 +30,6 @@ extern "C" {
     fn FfiInitialize(root_dir_utf8: *const c_char) -> bool;
     fn FfiShutdown();
     fn FfiGetRecords(out_records: *mut FFIRecord, max_count: i32) -> i32;
-    fn FfiCopyToClipboard(text_utf8: *const c_char) -> bool;
-    fn FfiCopyRecord(id: i64) -> bool;
     fn FfiDeleteRecord(id: i64) -> bool;
     fn FfiTogglePin(id: i64) -> bool;
     fn FfiBatchDelete(ids: *const i64, count: i32) -> i32;
@@ -51,6 +50,7 @@ pub fn shutdown() {
 }
 
 // 获取所有记录
+
 pub fn get_records() -> Vec<crate::commands::ClipRecord> {
     let mut buffer = vec![FFIRecord {
         id: 0,
@@ -98,17 +98,6 @@ pub fn get_records() -> Vec<crate::commands::ClipRecord> {
         });
     }
     records
-}
-
-// 复制到剪贴板
-pub fn copy_to_clipboard(text: &str) -> bool {
-    let c_str = CString::new(text).unwrap_or_default();
-    unsafe { FfiCopyToClipboard(c_str.as_ptr()) }
-}
-
-// 复制记录
-pub fn copy_record(id: i64) -> bool {
-    unsafe { FfiCopyRecord(id) }
 }
 
 // 删除记录
