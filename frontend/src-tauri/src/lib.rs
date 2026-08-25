@@ -4,12 +4,14 @@ mod ffi;
 use tauri::Manager;
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
@@ -75,6 +77,37 @@ pub fn run() {
                     let _ = window_clone.hide();
                 }
             });
+
+            // 注册全局快捷键
+            let app_handle = app.handle().clone();
+
+            // Ctrl+Alt+V: 显示/隐藏窗口
+            let app_clone = app_handle.clone();
+            let _ = app_handle.global_shortcut().on_shortcut(
+                "CmdOrCtrl+Alt+V",
+                move |_app, _event, _shortcut| {
+                    if let Some(window) = app_clone.get_webview_window("main") {
+                        if window.is_visible().unwrap_or(false) {
+                            let _ = window.hide();
+                        } else {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                },
+            );
+
+            // Ctrl+Alt+C: 快速复制最近一条记录
+            let app_clone2 = app_handle.clone();
+            let _ = app_handle.global_shortcut().on_shortcut(
+                "CmdOrCtrl+Alt+C",
+                move |_app, _event, _shortcut| {
+                    let records = ffi::get_records();
+                    if let Some(record) = records.first() {
+                        let _ = ffi::copy_to_clipboard(&record.content);
+                    }
+                },
+            );
 
             Ok(())
         })

@@ -30,6 +30,7 @@ extern "C" {
     fn FfiInitialize(root_dir_utf8: *const c_char) -> bool;
     fn FfiShutdown();
     fn FfiGetRecords(out_records: *mut FFIRecord, max_count: i32) -> i32;
+    fn FfiCopyToClipboard(text_utf8: *const c_char) -> bool;
     fn FfiDeleteRecord(id: i64) -> bool;
     fn FfiTogglePin(id: i64) -> bool;
     fn FfiBatchDelete(ids: *const i64, count: i32) -> i32;
@@ -47,6 +48,12 @@ pub fn initialize(root_dir: &str) -> bool {
 // 关闭
 pub fn shutdown() {
     unsafe { FfiShutdown(); }
+}
+
+// 复制文本到剪贴板
+pub fn copy_to_clipboard(text: &str) -> bool {
+    let c_str = CString::new(text).unwrap_or_default();
+    unsafe { FfiCopyToClipboard(c_str.as_ptr()) }
 }
 
 // 获取所有记录

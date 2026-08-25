@@ -133,10 +133,13 @@ function HistoryPage() {
             return `${Math.floor(diff / 60000)} 分钟前`;
         } else if (diff < 86400000) {
             return `${Math.floor(diff / 3600000)} 小时前`;
-        } else if (diff < 604800000) {
-            return `${Math.floor(diff / 86400000)} 天前`;
         } else {
-            return date.toLocaleDateString("zh-CN");
+            return date.toLocaleString("zh-CN", {
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+            });
         }
     };
 
