@@ -46,18 +46,57 @@ static LRESULT CALLBACK HiddenWndProc (
     if (msg == WM_CLIPBOARDUPDATE)
     {
         EnterCriticalSection (&G_RecordsLock);
+        // 先检查G_Records里是否已有相同内容（防止复制按钮触发监听导致重复）
+        if (IsClipboardFormatAvailable (CF_UNICODETEXT))
+        {
+            if (OpenClipboard (G_HiddenWnd))
+            {
+                HANDLE hData = GetClipboardData (CF_UNICODETEXT);
+                if (hData)
+                {
+                    wchar_t* pText = (wchar_t*)GlobalLock (hData);
+                    if (pText)
+                    {
+                        wstring clipText (pText, min ((int)wcslen (pText), 10000));
+                        GlobalUnlock (hData);
+                        CloseClipboard ();
+                        // 检查G_Records里是否已有相同内容
+                        bool exists = false;
+                        for (const auto& r : G_Records)
+                        {
+                            if (r.type == CLIP_TEXT && r.content == clipText)
+                            {
+                                exists = true;
+                                break;
+                            }
+                        }
+                        if (exists)
+                        {
+                            LeaveCriticalSection (&G_RecordsLock);
+                            return 0;
+                        }
+                    }
+                    else
+                    {
+                        CloseClipboard ();
+                    }
+                }
+                else
+                {
+                    CloseClipboard ();
+                }
+            }
+        }
+        // 内容是新的，调用捕获
         int oldCount = G_ClipManager.GetRecordCount ();
         G_ClipManager.OnClipboardUpdate ();
         int newCount = G_ClipManager.GetRecordCount ();
-        // 只提取新增的记录，不覆盖G_Records
         if (newCount > oldCount)
         {
             const auto& all = G_ClipManager.GetRecords ();
-            // 新记录在开头
             G_Records.insert (G_Records.begin (), all[0]);
             G_Storage.SaveRecords (G_Records);
         }
-        // 清理G_ClipManager内部记录，防止旧数据残留
         G_ClipManager.ClearRecords ();
         LeaveCriticalSection (&G_RecordsLock);
         return 0;
