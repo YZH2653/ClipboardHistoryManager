@@ -90,8 +90,10 @@ function HistoryPage() {
             return `${Math.floor(diff / 60000)} 分钟前`;
         } else if (diff < 86400000) {
             return `${Math.floor(diff / 3600000)} 小时前`;
+        } else if (diff < 604800000) {
+            return `${Math.floor(diff / 86400000)} 天前`;
         } else {
-            return date.toLocaleString("zh-CN");
+            return date.toLocaleDateString("zh-CN");
         }
     };
 
@@ -116,11 +118,7 @@ function HistoryPage() {
     const handleTogglePin = async (record: ClipRecord) => {
         try {
             await togglePin(record.id);
-            setRecords((prev) =>
-                prev.map((r) =>
-                    r.id === record.id ? { ...r, isPinned: !r.isPinned } : r,
-                ),
-            );
+            await loadRecords();
             message.success(record.isPinned ? "已取消置顶" : "已置顶");
         } catch (error) {
             message.error("操作失败");

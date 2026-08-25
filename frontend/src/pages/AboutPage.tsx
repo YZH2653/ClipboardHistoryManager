@@ -15,8 +15,7 @@ import {
     ThunderboltOutlined,
     SafetyCertificateOutlined,
 } from "@ant-design/icons";
-
-const { Paragraph, Link, Title } = Typography;
+const { Paragraph, Title } = Typography;
 
 function AboutPage() {
     // 复制邮箱
@@ -68,15 +67,14 @@ function AboutPage() {
                         </Space>
                     </Descriptions.Item>
                     <Descriptions.Item label="GitHub">
-                        <Link
-                            href="https://github.com/YZH2653/ClipboardHistoryManager"
-                            target="_blank"
+                        <Button
+                            type="link"
+                            icon={<GithubOutlined />}
+                            onClick={() => window.open("https://github.com/YZH2653/ClipboardHistoryManager", "_blank")}
+                            style={{ padding: 0 }}
                         >
-                            <Space>
-                                <GithubOutlined />
-                                ClipboardHistoryManager
-                            </Space>
-                        </Link>
+                            ClipboardHistoryManager
+                        </Button>
                     </Descriptions.Item>
                 </Descriptions>
             </Card>
