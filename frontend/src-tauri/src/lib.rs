@@ -78,6 +78,12 @@ pub fn run() {
                 }
             });
 
+            // 检测 --minimized 参数（开机自启时隐藏窗口）
+            let args: Vec<String> = std::env::args().collect();
+            if args.contains(&"--minimized".to_string()) {
+                let _ = window.hide();
+            }
+
             // 注册全局快捷键
             let app_handle = app.handle().clone();
 
