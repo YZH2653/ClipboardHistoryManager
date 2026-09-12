@@ -39,7 +39,7 @@ function AboutPage() {
                         <Tag color="blue">v2.0.0</Tag>
                     </Descriptions.Item>
                     <Descriptions.Item label="更新日期">
-                        2026-08-25
+                        2026-08-26
                     </Descriptions.Item>
                     <Descriptions.Item label="技术栈">
                         <Space wrap>
@@ -47,7 +47,8 @@ function AboutPage() {
                             <Tag color="blue">TypeScript</Tag>
                             <Tag color="cyan">Ant Design</Tag>
                             <Tag color="orange">Tauri</Tag>
-                            <Tag color="red">Rust</Tag>
+                            <Tag color="red">C++</Tag>
+                            <Tag color="magenta">Rust</Tag>
                             <Tag color="purple">Vite</Tag>
                         </Space>
                     </Descriptions.Item>
@@ -101,7 +102,7 @@ function AboutPage() {
                                 全局快捷键
                             </div>
                             <div style={{ color: "#666" }}>
-                                Ctrl+Alt+V 显示/隐藏窗口，Ctrl+Alt+C 快速复制最近记录
+                                Ctrl+Alt+V 显示/隐藏窗口
                             </div>
                         </div>
                     </div>
@@ -127,11 +128,6 @@ function AboutPage() {
                             <Tag>Ctrl</Tag> + <Tag>Alt</Tag> + <Tag>V</Tag>
                         </Space>
                     </Descriptions.Item>
-                    <Descriptions.Item label="快速复制最近记录">
-                        <Space wrap>
-                            <Tag>Ctrl</Tag> + <Tag>Alt</Tag> + <Tag>C</Tag>
-                        </Space>
-                    </Descriptions.Item>
                 </Descriptions>
             </Card>
 
@@ -145,14 +141,16 @@ function AboutPage() {
                                 <div>
                                     <Tag color="blue">v2.0.0</Tag>
                                     <span style={{ color: "#999", marginLeft: 8 }}>
-                                        2026-08-25
+                                        2026-08-26
                                     </span>
                                     <Paragraph style={{ marginTop: 8 }}>
                                         <ul>
-                                            <li>全新前端界面（React + TypeScript + Ant Design）</li>
-                                            <li>现代化 UI 设计</li>
-                                            <li>更好的用户体验</li>
-                                            <li>全局快捷键支持</li>
+                                            <li>全新 Tauri + React + C++ FFI 架构</li>
+                                            <li>现代化 UI 设计（Ant Design）</li>
+                                            <li>系统托盘集成，最小化到托盘</li>
+                                            <li>单实例防止重复打开</li>
+                                            <li>开机自启隐藏到托盘</li>
+                                            <li>全局快捷键 Ctrl+Alt+V</li>
                                         </ul>
                                     </Paragraph>
                                 </div>

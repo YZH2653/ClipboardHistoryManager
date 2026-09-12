@@ -183,15 +183,9 @@ bool FfiInitialize (const char* rootDirUtf8)
     G_Storage.LoadSettings (retention, maxRec);
     G_ClipManager.SetMaxRecords (maxRec);
 
+    // 直接加载到G_Records，不经过G_ClipManager
     G_Storage.LoadRecords (G_Records);
-    for (auto& r : G_Records)
-    {
-        G_ClipManager.AddRecord (r);
-    }
-    G_Records = G_ClipManager.GetRecords ();
-
     G_Storage.DeleteExpiredRecords (G_Records, retention);
-    G_Records = G_ClipManager.GetRecords ();
 
     G_ClipThread = CreateThread (
         NULL, 0, ClipThreadProc, NULL, 0, NULL);
@@ -252,31 +246,6 @@ int FfiGetRecords (FFIRecord* outRecords, int maxCount)
     }
     LeaveCriticalSection (&G_RecordsLock);
     return count;
-}
-
-// 复制文本到剪贴板
-extern "C" __declspec(dllexport)
-bool FfiCopyToClipboard (const char* textUtf8)
-{
-    wstring wtext = Utf8ToWstring (string (textUtf8));
-    return G_ClipManager.CopyToClipboard (wtext);
-}
-
-// 通过ID复制记录内容
-extern "C" __declspec(dllexport)
-bool FfiCopyRecord (int64_t id)
-{
-    EnterCriticalSection (&G_RecordsLock);
-    for (const auto& r : G_Records)
-    {
-        if (r.id == id)
-        {
-            LeaveCriticalSection (&G_RecordsLock);
-            return G_ClipManager.CopyToClipboard (r.content);
-        }
-    }
-    LeaveCriticalSection (&G_RecordsLock);
-    return false;
 }
 
 // 删除记录
