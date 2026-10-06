@@ -3,6 +3,7 @@ name = "clipboard-history-manager"
 version = "2.0.0"
 description = "历史剪贴板管理器"
 authors = ["YZH2653"]
+license = "MIT"
 edition = "2021"
 
 [lib]

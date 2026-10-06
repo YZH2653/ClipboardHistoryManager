@@ -127,11 +127,15 @@ React 前端 → Tauri invoke → Rust FFI → C++ 后端
 
 ## 📄 许可证
 
-MIT License
+本项目基于 [MIT License](LICENSE) 开源。
+
+Copyright (c) 2026 YZH2653
 
 ## 👨‍💻 作者
 
 YZH2653
+
+GitHub：[YZH2653/ClipboardHistoryManager](https://github.com/YZH2653/ClipboardHistoryManager)
 
 ## 📧 联系方式
 
